@@ -1,0 +1,67 @@
+universe:
+  sp500:
+    membership_file: "S&P 500 Historical Components & Changes(11-16-2025).csv"
+    start_date: "2014-01-01"
+    end_date: "2025-11-11"
+  nasdaq100:
+    start_date: "2014-01-01"
+    end_date: "2024-12-31"
+  russell2000:
+    start_date: "2014-01-01"
+    end_date: "2024-12-31"
+
+storage:
+  local:   # Local storage (development)
+    root_path: "./data"
+  azure:   # Azure Storage Account
+    account_name: "stfinsightdata"
+    container_name: "finsight-data"
+    use_managed_identity: true
+
+fetcher:
+  tiingo:
+    api_key: "a4bc193abdeb46e64975469cb3a54006b13c25ac"
+  fred:
+    api_key: "b78aa296ac03dce863e0415e6dccdc91"
+  max_workers: 10
+  lookback_days: 5
+  # Chunk size for backfill operations
+  chunk_size: 100
+  # Enable/disable fetching corporate actions (dividends, splits)
+  fetch_actions: true
+  # Retry configuration
+  retry:
+    max_attempts: 3
+    exponential_base: 2
+    min_wait: 2
+    max_wait: 10
+
+# Expected Returns Configuration
+expected_returns:
+  # Factor premia shrinkage (Option 2)
+  premia_shrinkage:
+    enabled: true
+    weight: 0.5  # 0.0 = use only historical, 1.0 = use only sample estimate
+    historical_market_premium: 0.005  # 6% annual = 0.005 monthly
+    historical_esg_premium: 0.0  # Assume zero long-term ESG premium
+
+  # Beta capping/winsorization (Option 3)
+  beta_caps:
+    enabled: true
+    market_cap: 3.0  # Cap β_market at [-3, 3]
+    esg_cap: 5.0  # Cap β_ESG at [-5, 5]
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "json"  # json or text
+
+# Scheduling Configuration (for Azure Functions)
+schedules:
+  daily_update:
+    cron: "0 6 * * 1-5"  # Weekdays at 6 AM UTC
+    description: "Daily incremental data update"
+
+  weekly_universe_refresh:
+    cron: "0 2 * * 6"  # Saturdays at 2 AM UTC
+    description: "Weekly universe refresh"

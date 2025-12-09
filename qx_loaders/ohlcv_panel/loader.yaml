@@ -1,0 +1,127 @@
+loader:
+  id: ohlcv_panel
+  version: 1.0.0
+  description: "Load OHLCV price data for a list of symbols with date range filtering"
+
+inputs:
+  - name: equity_prices
+    required: true
+    type:
+      domain: market-data
+      asset_class: equity
+      subdomain: ohlcv
+    description: "OHLCV price data from curated data"
+
+parameters:
+  start_date:
+    type: str
+    required: true
+    description: "Period start date (YYYY-MM-DD)"
+    example: "2014-01-01"
+
+  end_date:
+    type: str
+    required: true
+    description: "Period end date (YYYY-MM-DD)"
+    example: "2024-12-31"
+
+  symbols:
+    type: list
+    item_type: str
+    required: true
+    description: "List of ticker symbols to load OHLCV data for"
+    example: ["AAPL", "MSFT", "GOOGL"]
+    notes: |
+      Can be fed from historic_members loader output.
+      Empty list returns empty DataFrame.
+
+  frequency:
+    type: str
+    default: "D"
+    allowed: ["D", "W", "M"]
+    description: |
+      Price data frequency:
+      - "D": Daily prices
+      - "W": Weekly prices
+      - "M": Monthly prices
+    notes: "Must match the frequency partition in curated data"
+
+  exchange:
+    type: str
+    default: "US"
+    description: "Exchange filter for price data"
+    allowed: ["US", "HK"]
+    notes: "OHLCV data is partitioned by exchange"
+
+  require_volume:
+    type: bool
+    default: false
+    description: "If true, filter out rows where volume is null or zero"
+    notes: "Useful for ensuring tradeable data points"
+
+output:
+  type: dataframe
+  description: |
+    DataFrame with OHLCV price data for the specified symbols and period.
+
+    Columns:
+      - date: Trading date
+      - symbol: Stock ticker symbol
+      - open: Opening price
+      - high: High price
+      - low: Low price
+      - close: Closing price (adjusted for splits/dividends)
+      - volume: Trading volume
+      - adj_close: Adjusted closing price (if available)
+      - schema_version: Schema version
+      - ingest_ts: Data ingestion timestamp
+
+    Note: Frequency depends on the 'frequency' parameter (D/W/M).
+
+metadata:
+  layer: loader
+  output_persistence: none
+  usage_pattern: pipeline_only
+  typical_consumers:
+    - ESG factor models (for returns calculation)
+    - Beta calculation models
+    - Portfolio optimization models
+    - Backtesting frameworks
+
+examples:
+  - name: "Load daily prices for universe"
+    code: |
+      Task(
+          id="LoadPrices",
+          run=run_loader(
+              package_path="qx_loaders/ohlcv_panel",
+              registry=registry,
+              backend=backend,
+              resolver=resolver,
+              overrides={
+                  "start_date": "2014-01-01",
+                  "end_date": "2024-12-31",
+                  "symbols": ["AAPL", "MSFT", "GOOGL"],
+                  "frequency": "D",
+                  "exchange": "US",
+                  "require_volume": False
+              }
+          ),
+          deps=[]
+      )
+
+  - name: "Load prices from upstream universe loader"
+    code: |
+      Task(
+          id="LoadPrices",
+          run=lambda ctx: run_loader(
+              package_path="qx_loaders/ohlcv_panel",
+              overrides={
+                  "symbols": ctx["GetHistoricMembers"]["output"],
+                  "start_date": "2014-01-01",
+                  "end_date": "2024-12-31",
+                  "frequency": "D"
+              }
+          )(),
+          deps=["GetHistoricMembers"]
+      )

@@ -1,0 +1,124 @@
+loader:
+  id: esg_panel
+  version: 1.0.0
+  description: "Load ESG scores for a list of symbols with optional continuity filtering"
+
+inputs:
+  - name: esg_scores
+    required: true
+    type:
+      domain: esg
+      asset_class: equity
+      subdomain: esg_scores
+    description: "ESG scores from curated data"
+
+parameters:
+  start_date:
+    type: str
+    required: true
+    description: "Period start date (YYYY-MM-DD)"
+    example: "2014-01-01"
+    notes: "Used to determine ESG year range (with 1-year lag: 2014 → esg_year=2013)"
+
+  end_date:
+    type: str
+    required: true
+    description: "Period end date (YYYY-MM-DD)"
+    example: "2024-12-31"
+    notes: "Used to determine ESG year range (with 1-year lag: 2024 → esg_year=2023)"
+
+  symbols:
+    type: list
+    item_type: str
+    required: true
+    description: "List of ticker symbols to load ESG data for"
+    example: ["AAPL", "MSFT", "GOOGL"]
+    notes: |
+      Can be fed from historic_members loader output.
+      Empty list returns empty DataFrame.
+
+  continuity:
+    type: str
+    default: "any"
+    allowed: ["any", "available", "complete"]
+    description: |
+      Continuity filter mode for ESG data:
+
+      - "any": Return all symbols with any ESG data (no filtering)
+      - "available": Continuous from each symbol's first to last ESG date
+      - "complete": Continuous coverage for full period (start_date to end_date)
+    notes: |
+      ESG scores are published annually (one record per company per ESG year).
+      Continuity checks are based on ESG publication years (esg_year column).
+
+      Mode details:
+
+      1. "any" (most lenient):
+         - Returns all symbols with any ESG data in the period
+         - No continuity requirements
+         - Use for: Maximizing coverage, exploratory analysis
+
+      2. "available" (moderate - legacy method):
+         - Each symbol checked from its own first ESG year to its own last ESG year
+         - Example: Symbol with esg_years 2017-2023 needs all 7 years continuous
+         - Includes recent IPOs with shorter but complete histories
+         - Use for: Balanced coverage with quality
+
+      3. "complete" (most strict):
+         - All symbols must cover full period: start_date to end_date
+         - Example: For 2014-2024, all must have esg_years 2013-2023 (11 years)
+         - Excludes symbols with shorter histories (e.g., recent IPOs)
+         - Use for: Factor research requiring consistent long-term histories
+
+  exchange:
+    type: str
+    default: "US"
+    description: "Exchange filter for ESG data"
+    allowed: ["US", "HK"]
+    notes: "ESG data is partitioned by exchange"
+
+output:
+  type: dataframe
+  description: |
+    DataFrame with annual ESG scores for the specified symbols and period.
+
+    Columns:
+      - ticker: Stock ticker symbol
+      - gvkey: Global Company Key
+      - esg_year: ESG score publication year (e.g., 2023)
+      - year: Calendar year when data is available for trading (year = esg_year + 1)
+      - esg_score: Composite ESG score (0-100)
+      - environmental_pillar_score: Environmental component
+      - social_pillar_score: Social component
+      - governance_pillar_score: Governance component
+      - schema_version: Schema version
+      - ingest_ts: Data ingestion timestamp
+
+    Note: One record per company per ESG year (annual frequency).
+
+    If continuity != "any":
+      Only includes symbols with complete annual coverage (no gaps in ESG years).
+      Symbols with gaps are excluded entirely.
+
+    If continuous=False:
+      Includes all available ESG data for symbols, even if incomplete.
+
+  example: |
+    DataFrame with ~500 rows for 5 symbols over 10 years (monthly)
+
+metadata:
+  use_cases:
+    - "Load ESG panel for universe members (from historic_members loader)"
+    - "Filter to continuous ESG coverage for factor analysis"
+    - "Combine with price data for ESG factor research"
+    - "Build ESG-based portfolios with proper data coverage"
+
+  dependencies:
+    - ESG scores must be built first (qx_builders/esg_score)
+    - Typically chained after historic_members or continuous_universe loader
+
+  performance:
+    - Uses filter pushdown to load only required symbols
+    - Continuity check scans all loaded data for gaps
+    - For large symbol lists, consider batching
+

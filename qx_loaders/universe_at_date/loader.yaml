@@ -1,0 +1,31 @@
+loader:
+  id: universe_at_date
+  version: 1.0.0
+  description: "Select symbols that were in universe on a specific date"
+
+inputs:
+  - name: membership_data
+    required: true
+    type:
+      domain: membership
+      subdomain: intervals
+    description: "Membership interval data"
+
+parameters:
+  date:
+    type: str
+    required: true
+    description: "Query date (YYYY-MM-DD)"
+    example: "2024-12-31"
+
+  universe:
+    type: str
+    default: "sp500"
+    description: "Universe identifier"
+    allowed: ["sp500", "russell1000", "nasdaq100"]
+
+output:
+  type: list
+  item_type: str
+  description: "List of ticker symbols in the universe on the specified date"
+  example: ["AAPL", "MSFT", "GOOGL", ...]

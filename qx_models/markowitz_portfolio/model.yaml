@@ -1,0 +1,333 @@
+model:
+  id: markowitz_portfolio
+  version: 1.0.0
+  featureset_id: expected_returns_v1+two_factor_betas_v1+ohlcv_v1
+  description: |
+    Markowitz Mean-Variance Portfolio Optimization with ESG Control
+
+    Solves the classic Markowitz mean-variance optimization problem with
+    additional ESG exposure constraints:
+
+        Maximize: μ'w - 0.5*γ*w'Σw
+
+        Subject to:
+            - Budget: Σw = 1 (fully invested)
+            - Long-only: w ≥ 0 (no short selling)
+            - Position limits: 0 ≤ w_i ≤ w_max
+            - ESG exposure: L_ESG ≤ β_ESG'w ≤ U_ESG
+            - Sector concentration: Σw[sector] ≤ sector_cap
+            - (Optional) Turnover penalty: λ*||w - w_prev||₁
+
+    Key Features:
+        - Ledoit-Wolf shrinkage covariance estimation
+        - ESG-neutral or ESG-tilted portfolio construction
+        - Sector diversification constraints
+        - Turnover cost modeling
+        - Efficient frontier generation
+        - CVXPY (preferred) or SciPy (fallback) optimization
+
+    Academic References:
+        - Markowitz (1952): "Portfolio Selection"
+        - Ledoit & Wolf (2003): "Improved estimation of the covariance matrix"
+        - Pastor, Stambaugh & Taylor (2021): "Sustainable investing in equilibrium"
+
+io:
+  inputs:
+    # Expected returns from factor model
+    - name: expected_returns
+      required: true
+      type:
+        domain: derived-metrics
+        asset_class: equity
+        subdomain: factor_expected_returns
+        region: null
+        frequency: null
+      description: |
+        Expected returns from factor_expected_returns model.
+        Used as μ in mean-variance optimization objective.
+
+        Must contain: symbol, date, ER_monthly
+
+    # Two-factor betas (for ESG exposure constraint)
+    - name: two_factor_betas
+      required: true
+      type:
+        domain: derived-metrics
+        asset_class: equity
+        subdomain: two_factor_betas
+        region: null
+        frequency: null
+      description: |
+        Factor betas from two_factor_regression model.
+        ESG beta (β_ESG) used for ESG exposure constraint: L ≤ β'w ≤ U
+
+        Must contain: symbol, beta_esg
+
+    # Historical prices (for covariance estimation)
+    - name: equity_prices
+      required: true
+      type:
+        domain: market-data
+        asset_class: equity
+        subdomain: ohlcv
+        region: US
+        frequency: D
+      description: |
+        Historical equity prices for covariance estimation.
+        Resampled to monthly frequency and used to build Σ matrix.
+
+        Lookback period controlled by lookback_months parameter.
+
+    # Risk-free rate (for excess returns in covariance)
+    - name: risk_free
+      required: true
+      type:
+        domain: reference-rates
+        asset_class: null
+        subdomain: zero_rate
+        region: US
+        frequency: D
+      description: |
+        Risk-free rate for calculating excess returns.
+        Used in covariance estimation (excess return covariance).
+
+    # Sector metadata (optional, for sector constraints)
+    - name: sector_mapping
+      required: false
+      type:
+        domain: metadata
+        asset_class: equity
+        subdomain: sectors
+        region: null
+        frequency: null
+      description: |
+        GICS sector mapping (ticker → sector).
+        Required only if sector_constraints=true.
+
+        If not provided, sector constraints will be skipped.
+
+  output:
+    type:
+      domain: derived-metrics
+      asset_class: equity
+      subdomain: portfolio_weights
+      region: null
+      frequency: null
+    description: |
+      Optimal portfolio weights from mean-variance optimization.
+
+      Contains:
+        - Identifiers: symbol, optimization_date
+        - Weights: weight (portfolio allocation)
+        - Expected returns: exp_return_monthly
+        - Risk metrics: esg_beta, sector
+        - Portfolio stats: portfolio_return, portfolio_vol, portfolio_sharpe, portfolio_esg_exposure
+        - Metadata: model, model_version, featureset_id, run_id, run_ts
+
+      Output frequency: As-requested (typically monthly rebalancing)
+
+parameters:
+  # Risk aversion (mean-variance tradeoff)
+  gamma:
+    type: float
+    default: 4.0
+    min: 0.1
+    max: 20.0
+    description: |
+      Risk aversion parameter (γ in objective function).
+
+      Controls mean-variance tradeoff:
+        - Low γ (1-2): Aggressive (high return, high risk)
+        - Medium γ (3-5): Balanced (default: 4.0)
+        - High γ (6-10): Conservative (low risk, lower return)
+
+      Interpretation:
+        γ = E[ΔRisk]/E[ΔReturn] tolerance
+
+        γ=4 means investor requires 4 units of expected return
+        to accept 1 unit of variance increase.
+
+  # Portfolio constraints
+  long_only:
+    type: bool
+    default: true
+    description: |
+      Restrict to long-only positions (w ≥ 0).
+
+      true: No short selling (typical for retail/institutional)
+      false: Allow short positions (hedge funds, market-neutral)
+
+  position_max:
+    type: float
+    default: 0.10
+    min: 0.01
+    max: 1.0
+    description: |
+      Maximum position size per stock (w_i ≤ position_max).
+
+      Prevents excessive concentration:
+        - 0.05 (5%): Highly diversified (20+ holdings)
+        - 0.10 (10%): Balanced diversification (default)
+        - 0.20 (20%): Concentrated (5-10 holdings)
+
+      Regulatory limits:
+        - UCITS: 10% per position
+        - SEC: 5% for diversified funds
+
+  # ESG exposure constraints
+  esg_neutral:
+    type: bool
+    default: false
+    description: |
+      Enforce ESG-neutral portfolio (β_ESG'w ≈ 0).
+
+      true: ESG exposure in [-0.05, 0.05] (neutral)
+      false: No ESG constraint (let optimizer decide)
+
+      If custom ESG bounds provided, this is ignored.
+
+  esg_lower_bound:
+    type: float
+    default: null
+    description: |
+      Custom ESG lower bound (L_ESG in constraint).
+
+      Constraint: β_ESG'w ≥ esg_lower_bound
+
+      Examples:
+        - null: No lower bound (unless esg_neutral=true)
+        - 0.0: Exclude ESG-negative portfolios
+        - 0.5: ESG-tilted (high ESG exposure)
+        - -0.5: ESG-defensive (low ESG exposure)
+
+  esg_upper_bound:
+    type: float
+    default: null
+    description: |
+      Custom ESG upper bound (U_ESG in constraint).
+
+      Constraint: β_ESG'w ≤ esg_upper_bound
+
+      Examples:
+        - null: No upper bound (unless esg_neutral=true)
+        - 0.0: Cap ESG exposure at zero
+        - 0.5: Moderate ESG tilt
+
+  # Sector concentration constraints
+  sector_constraints:
+    type: bool
+    default: false
+    description: |
+      Apply GICS sector concentration limits.
+
+      true: Enforce Σw[sector] ≤ sector_cap for each sector
+      false: No sector constraints
+
+      Requires sector_mapping input to be provided.
+
+  sector_cap:
+    type: float
+    default: 0.30
+    min: 0.10
+    max: 1.0
+    description: |
+      Maximum allocation per GICS sector (if sector_constraints=true).
+
+      Prevents sector concentration risk:
+        - 0.20 (20%): Aggressive diversification
+        - 0.30 (30%): Balanced (default)
+        - 0.50 (50%): Allow sector concentration
+
+  # Covariance estimation
+  lookback_months:
+    type: int
+    default: 36
+    min: 12
+    max: 120
+    description: |
+      Lookback period for covariance estimation (months).
+
+      Trade-off:
+        - Short (12-24): Responsive to recent volatility
+        - Medium (36-60): Balanced (default: 36)
+        - Long (60-120): Stable, smooth estimates
+
+      Typical ranges:
+        - Practitioner: 36-60 months (3-5 years)
+        - Academic: 60-120 months (5-10 years)
+
+  shrinkage_intensity:
+    type: float
+    default: 0.25
+    min: 0.0
+    max: 1.0
+    description: |
+      Ledoit-Wolf covariance shrinkage intensity.
+
+      Σ_shrunk = (1-δ)*Σ_sample + δ*Σ_diagonal
+
+      where δ is shrinkage_intensity.
+
+      Values:
+        - 0.0: Use sample covariance (no shrinkage)
+        - 0.25: Moderate shrinkage (default, Ledoit-Wolf optimal)
+        - 0.5: High shrinkage (very conservative)
+        - 1.0: Diagonal only (no correlations)
+
+      Benefits:
+        - Reduces estimation error in Σ
+        - Improves out-of-sample portfolio performance
+        - Especially useful for large N (many assets)
+
+  # Turnover penalty (for rebalancing)
+  turnover_penalty:
+    type: float
+    default: 0.0
+    min: 0.0
+    max: 0.1
+    description: |
+      Turnover penalty strength (λ in objective).
+
+      Objective: μ'w - 0.5*γ*w'Σw - λ*||w - w_prev||₁
+
+      where w_prev is previous portfolio weights.
+
+      Values:
+        - 0.0: No penalty (default, fresh optimization)
+        - 0.01: Light penalty (1% cost per unit turnover)
+        - 0.05: Moderate penalty (reduce rebalancing)
+        - 0.10: Heavy penalty (infrequent rebalancing)
+
+      Use cases:
+        - λ > 0: Rebalancing with transaction costs
+        - λ = 0: Initial portfolio construction
+
+  previous_weights_input:
+    type: str
+    default: null
+    description: |
+      Name of input containing previous portfolio weights.
+
+      Required only if turnover_penalty > 0.
+
+      If provided, model will load previous weights and apply
+      turnover penalty: λ*||w - w_prev||₁
+
+      Expected format: DataFrame with columns [symbol, weight]
+
+  # Efficient frontier generation
+  compute_frontier:
+    type: bool
+    default: false
+    description: |
+      Compute efficient frontier for multiple γ values.
+
+      true: Solve for γ ∈ [1, 2, 3, 4, 5, 6, 8, 10]
+            and return all portfolios
+
+      false: Solve only for specified γ (default)
+
+      Frontier useful for:
+        - Visualizing risk-return tradeoff
+        - Selecting optimal γ for client risk tolerance
+        - Validating optimization robustness

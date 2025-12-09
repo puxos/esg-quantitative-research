@@ -1,0 +1,48 @@
+builder:
+  id: gvkey_mapping
+  version: 1.0.0
+  description: "GVKEY-ticker mapping builder - creates mapping from GVKEY identifiers to ticker symbols"
+
+io:
+  inputs:
+    - name: crsp_file
+      type: file
+      description: "CRSP data file containing GVKEY-ticker mappings"
+
+  output:
+    type:
+      domain: metadata
+      asset_class: null
+      subdomain: gvkey_mapping
+      frequency: null
+
+parameters:
+  exchange:
+    type: string
+    default: "US"
+    description: "Exchange identifier (e.g., US, HK, GLOBAL)"
+
+  crsp_file:
+    type: string
+    default: "./raw/data_mapping.xlsx"
+    description: "Path to CRSP/mapping data file (relative to package)"
+
+partitions:
+  required:
+    - exchange
+
+  defaults:
+    exchange: US
+
+examples:
+  - description: "Build GVKEY mapping for US exchange"
+    partitions:
+      exchange: US
+    overrides:
+      crsp_file: "./raw/data_mapping.xlsx"
+
+  - description: "Build GVKEY mapping for Hong Kong exchange"
+    partitions:
+      exchange: HK
+    overrides:
+      crsp_file: "./raw/data_mapping.xlsx"

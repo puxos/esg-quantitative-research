@@ -1,0 +1,6 @@
+storage:
+  backend: local
+  base_uri: "file://."
+  table_format: parquet
+  write_mode: append
+  small_file_compaction_mb: 128

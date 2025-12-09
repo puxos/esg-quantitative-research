@@ -1,0 +1,97 @@
+# Continuous Membership Model
+# Identifies tickers with continuous membership in a universe over a specified period
+
+model:
+  id: continuous_membership
+  version: 1.0.0
+  description: |
+    Extract tickers with continuous membership over a specified time period.
+
+    Continuity criteria:
+    - Ticker must be present on at least min_continuity_pct of expected business days
+    - Detects and reports gaps in membership
+    - Eliminates survivorship bias by using historical membership data
+
+    Use cases:
+    - Portfolio backtests requiring continuous data
+    - Factor model construction
+    - Risk model calibration
+
+io:
+  inputs:
+    - name: membership_daily
+      required: true
+      type:
+        domain: membership
+        asset_class: null
+        subdomain: daily
+        region: null
+        frequency: null
+      description: Daily membership records (date, ticker pairs)
+
+  output:
+    type:
+      domain: derived-metrics
+      asset_class: equity
+      subdomain: continuous_members
+      region: null
+      frequency: null
+    description: |
+      Filtered list of tickers with continuous membership.
+      Includes metadata: date ranges, continuity percentage, gap counts.
+
+parameters:
+  start_date:
+    type: string
+    default: "2014-01-01"
+    description: Start date for continuity analysis (YYYY-MM-DD)
+    validation:
+      pattern: "\\d{4}-\\d{2}-\\d{2}"
+
+  end_date:
+    type: string
+    default: "2024-12-31"
+    description: End date for continuity analysis (YYYY-MM-DD)
+    validation:
+      pattern: "\\d{4}-\\d{2}-\\d{2}"
+
+  min_continuity_pct:
+    type: float
+    default: 0.99
+    min: 0.0
+    max: 1.0
+    description: |
+      Minimum percentage of business days ticker must be present (0.0-1.0).
+      Example: 0.99 = 99% presence required (allows ~2-3 missing days/year)
+
+  universe:
+    type: string
+    default: "sp500"
+    description: Universe identifier (e.g., sp500, nasdaq100)
+
+  mode:
+    type: string
+    default: "daily"
+    description: Membership mode (daily or intervals)
+
+metadata:
+  author: Qx System
+  created: 2024-12-04
+  tags:
+    - membership
+    - continuity
+    - survivorship-bias
+
+  references:
+    - Legacy: src/programs/check_esg_continuity.py
+    - Legacy: src/universe/universe.py::get_all_historical_members()
+
+  notes: |
+    This model addresses survivorship bias by:
+    1. Loading ALL historical members (not just current)
+    2. Checking continuity over the ENTIRE analysis period
+    3. Filtering for continuous presence before downstream use
+
+    Difference from loader filters:
+    - Loader filters: Simple date/ticker predicates
+    - This model: Complex business logic (gap detection, continuity metrics)

@@ -1,0 +1,246 @@
+model:
+  id: factor_expected_returns
+  version: 1.0.0
+  featureset_id: two_factor_betas_v1+market_ohlcv_v1+rf_v1
+  description: |
+    Factor Expected Returns Model (Extended CAPM with ESG)
+
+    Calculates expected returns using factor model framework:
+        E[R_i,t] = RF_t + β_market × λ_market + β_ESG × λ_ESG
+
+    Key Features:
+        - HAC-robust factor premia (Newey-West correction)
+        - Optional shrinkage toward historical long-term means
+        - Beta capping to prevent extreme leverage
+        - Compound annualization for realistic return projections
+        - Time-varying risk-free rates
+
+    Statistical Rigor:
+        - Factor premia estimated with HAC standard errors (maxlags=12)
+        - Shrinkage corrects for sample period bias
+        - Beta capping prevents outlier influence
+        - Compound annualization: (1 + ER_monthly)^12 - 1
+
+    Academic References:
+        - Sharpe (1964): "Capital asset prices: A theory of market equilibrium"
+        - Pastor, Stambaugh & Taylor (2021): "Sustainable investing in equilibrium"
+        - Newey & West (1994): "Automatic lag selection in covariance matrix estimation"
+
+io:
+  inputs:
+    # Two-factor betas (market and ESG exposures from regression)
+    - name: two_factor_betas
+      required: true
+      type:
+        domain: derived-metrics
+        asset_class: equity
+        subdomain: two_factor_betas
+        region: null
+        frequency: null
+      description: |
+        Pre-computed factor betas from two_factor_regression model.
+        Contains: symbol, date, beta_market, beta_esg
+
+        If using latest betas (constant across time):
+          - One row per symbol (latest estimate)
+          - Applied to all forecast dates
+
+        If using time-varying betas (rolling window):
+          - Multiple rows per symbol (time-series)
+          - Most recent beta used for each forecast date
+
+    # Market prices (SPY as market proxy)
+    - name: market_prices
+      required: true
+      type:
+        domain: market-data
+        asset_class: equity
+        subdomain: ohlcv
+        region: US
+        frequency: D
+      description: |
+        Market portfolio proxy (SPY) for calculating market excess returns.
+        Used to estimate market risk premium (λ_market) via HAC-robust mean.
+
+    # Risk-free rate (US Treasury rates)
+    - name: risk_free
+      required: true
+      type:
+        domain: reference-rates
+        asset_class: null
+        subdomain: zero_rate
+        region: US
+        frequency: D
+      description: |
+        Risk-free rate time-series (US Treasury rates).
+        Resampled to monthly frequency for expected return calculations.
+
+    # ESG factors (ESG factor returns for estimating ESG premium)
+    - name: esg_factors
+      required: true
+      type:
+        domain: derived-metrics
+        asset_class: equity
+        subdomain: esg_factors
+        region: null
+        frequency: null
+      description: |
+        ESG factor returns from esg_factor model.
+        Used to estimate ESG risk premium (λ_ESG) via HAC-robust mean.
+        Typically uses "ESG" factor (composite), but can use E, S, G, or ESG_mom.
+
+  output:
+    type:
+      domain: derived-metrics
+      asset_class: equity
+      subdomain: factor_expected_returns
+      region: null
+      frequency: null
+    description: |
+      Expected returns for each stock at each forecast date.
+
+      Contains:
+        - Identifiers: symbol, date, beta_date
+        - Factor exposures: beta_market, beta_esg (original and capped)
+        - Risk-free rate: RF (monthly decimal)
+        - Expected returns: ER_monthly, ER_annual
+        - Factor premia: lambda_market, lambda_esg (metadata)
+
+      Output frequency: Monthly (one expected return per month per stock)
+      Time horizon: Forward-looking (E[R_t+1 | Info_t])
+
+parameters:
+  # Factor premium estimation (shrinkage correction for sample period bias)
+  apply_shrinkage:
+    type: bool
+    default: true
+    description: |
+      Apply shrinkage to factor premia toward historical long-term means.
+
+      Corrects for sample period bias (e.g., 2016-2024 may overestimate long-term premia).
+      Blends sample estimate with historical average:
+          λ_adjusted = w × λ_historical + (1-w) × λ_sample
+
+      where w is shrinkage_weight.
+
+      Recommended: true for short sample periods (< 20 years)
+
+  shrinkage_weight:
+    type: float
+    default: 0.5
+    min: 0.0
+    max: 1.0
+    description: |
+      Weight on historical long-term mean (0-1).
+
+      0.0 = Use sample estimate only (no shrinkage)
+      0.5 = Equal weight on historical and sample (default)
+      1.0 = Use historical mean only (ignore sample)
+
+      Common values:
+        - 0.5: Balanced (recommended for 10-15 year samples)
+        - 0.3: More weight on sample (for longer/stable periods)
+        - 0.7: More weight on history (for short/volatile periods)
+
+  historical_market_premium:
+    type: float
+    default: 0.005
+    description: |
+      Historical long-term equity risk premium (monthly decimal).
+
+      Default: 0.005 monthly (~6% annual) based on long-term US equity data.
+
+      Academic estimates (monthly):
+        - Sharpe (1964): ~0.004-0.006
+        - Fama-French (1992): ~0.005
+        - Pastor-Stambaugh (2021): ~0.004-0.006
+
+  historical_esg_premium:
+    type: float
+    default: 0.0
+    description: |
+      Historical long-term ESG risk premium (monthly decimal).
+
+      Default: 0.0 (assume zero, as ESG factor is recent).
+
+      Academic evidence is mixed:
+        - Pastor-Stambaugh-Taylor (2021): Negative ESG premium
+        - Other studies: Near-zero or positive
+
+      Use 0.0 as conservative baseline, let sample data inform estimate.
+
+  hac_maxlags:
+    type: int
+    default: 12
+    min: 1
+    max: 24
+    description: |
+      Number of lags for Newey-West HAC standard errors in factor premia estimation.
+
+      Default: 12 for monthly data (captures annual seasonality).
+
+      Follows Newey & West (1994) rule: maxlags = floor(4*(T/100)^(2/9))
+      For T=100 months, maxlags ≈ 12.
+
+      Higher values increase robustness but reduce efficiency.
+
+  # Beta capping (prevent extreme leverage from outlier betas)
+  cap_betas:
+    type: bool
+    default: true
+    description: |
+      Cap extreme factor betas to prevent unrealistic expected returns.
+
+      Stocks with extreme betas (e.g., β_market=3.2, β_ESG=-7.7) can create
+      unrealistic expected returns when combined with factor premia.
+
+      Capping retains 95%+ of typical betas while preventing extreme cases.
+
+      Recommended: true for portfolio construction and risk management.
+
+  beta_market_cap:
+    type: float
+    default: 3.0
+    min: 1.0
+    max: 10.0
+    description: |
+      Cap for market beta (symmetric: [-cap, +cap]).
+
+      Default: 3.0 (β_market ∈ [-3, 3])
+
+      Typical ranges:
+        - Most stocks: |β_market| < 2.0
+        - High-volatility stocks: |β_market| = 2.0-3.0
+        - Extreme cases: |β_market| > 3.0 (capped)
+
+  beta_esg_cap:
+    type: float
+    default: 5.0
+    min: 1.0
+    max: 10.0
+    description: |
+      Cap for ESG beta (symmetric: [-cap, +cap]).
+
+      Default: 5.0 (β_ESG ∈ [-5, 5])
+
+      ESG betas are typically more variable than market betas:
+        - Most stocks: |β_ESG| < 3.0
+        - High-exposure stocks: |β_ESG| = 3.0-5.0
+        - Extreme cases: |β_ESG| > 5.0 (capped)
+
+  use_latest_betas:
+    type: bool
+    default: true
+    description: |
+      Use latest beta estimates (constant across time) or time-varying betas.
+
+      true: Use most recent beta estimate for each stock, apply to all forecast dates
+            (Cross-sectional betas from full sample)
+
+      false: Use time-series of beta estimates (e.g., from rolling window regression)
+             Most recent available beta used for each forecast date
+             (Time-varying betas)
+
+      Recommended:
+        - true: For stable stocks, longer horizons
+        - false: For dynamic stocks, changing business models

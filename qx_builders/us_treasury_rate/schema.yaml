@@ -1,0 +1,108 @@
+# US Treasury Rate Schema
+# Reference rates from Federal Reserve Economic Data (FRED)
+
+dataset:
+  domain: reference-rates
+  asset_class: null
+  subdomain: treasury_rate
+  region: US
+  frequency: daily  # Daily data (can be resampled)
+
+contract:
+  schema_version: schema_v1
+
+  columns:
+    - name: date
+      type: date
+      description: Observation date
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: rate_type
+      type: string
+      description: Treasury maturity (3month, 1year, 5year, 10year, 30year)
+      required: true
+      filterable: true
+      filter_type: in
+
+    - name: series_id
+      type: string
+      description: FRED series ID (DGS3MO, DGS1, DGS5, DGS10, DGS30)
+      required: true
+      filterable: false
+
+    - name: rate
+      type: float
+      description: Annualized yield percentage
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: frequency
+      type: string
+      description: Data frequency (daily, weekly, monthly)
+      required: true
+      filterable: false
+
+    - name: source
+      type: string
+      description: Data source (FRED)
+      required: true
+      filterable: false
+
+  partition_keys:
+    - region
+    - rate_type
+    - frequency
+
+  filters:
+    date_range:
+      columns: [date]
+      type: range
+      description: Filter by observation date range
+      example: ["2020-01-01", "2024-12-31"]
+
+    rate_type_list:
+      columns: [rate_type]
+      type: in
+      description: Filter to specific maturities
+      example: ["3month", "10year"]
+
+    rate_threshold:
+      columns: [rate]
+      type: range
+      description: Filter by rate range (percentage)
+      example: [0, 5]
+
+  path_template: data/curated/risk-free/treasury_rate/{schema_version}/rate_type={rate_type}/frequency={frequency}
+
+parameters:
+  rate_type:
+    type: enum
+    values: ["3month", "1year", "5year", "10year", "30year"]
+    required: false
+    description: Treasury maturity to fetch
+
+metadata:
+  source: Federal Reserve Economic Data (FRED API)
+  description: |
+    US Treasury constant maturity rates across multiple maturities.
+    Used as risk-free rate proxy in financial models (CAPM, DCF, etc.).
+
+  dependencies: []
+
+  notes: |
+    Rate types and FRED series:
+      - 3month: DGS3MO (3-Month Treasury Constant Maturity)
+      - 1year: DGS1 (1-Year Treasury Constant Maturity)
+      - 5year: DGS5 (5-Year Treasury Constant Maturity)
+      - 10year: DGS10 (10-Year Treasury Constant Maturity)
+      - 30year: DGS30 (30-Year Treasury Constant Maturity)
+
+    Data available from 1960s to present.
+    Missing values (market holidays) marked as '.' in FRED API.
+    Builder handles resampling to weekly/monthly frequencies.
+
+    Region: US implied (no region partition needed)
+

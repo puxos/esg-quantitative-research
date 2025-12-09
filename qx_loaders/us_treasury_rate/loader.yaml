@@ -1,0 +1,105 @@
+# US Treasury Rate Loader Configuration
+# ======================================
+#
+# Loads US Treasury rate data (risk-free rates) from curated storage.
+# Assumes data has been built by the us_treasury_rate builder.
+
+loader:
+  id: us_treasury_rate
+  version: 1.0.0
+  description: "Load US Treasury rates (risk-free rates) for financial models"
+
+io:
+  inputs:
+    - name: treasury_rate_data
+      required: true
+      type:
+        domain: reference-rates
+        asset_class: null
+        subdomain: treasury_rate
+        region: US
+        frequency: null  # Will be specified via parameters
+
+parameters:
+  start_date:
+    type: str
+    required: true
+    description: "Start date for treasury rate data (YYYY-MM-DD)"
+    example: "2014-01-01"
+
+  end_date:
+    type: str
+    required: true
+    description: "End date for treasury rate data (YYYY-MM-DD)"
+    example: "2024-12-31"
+
+  rate_types:
+    type: list
+    item_type: str
+    required: true
+    description: "List of treasury maturities to load"
+    example: ["3month", "10year"]
+    allowed: ["3month", "1year", "5year", "10year", "30year"]
+    notes: |
+      Common rate types:
+      - 3month: 3-month T-bill rate (short-term proxy)
+      - 1year: 1-year T-note rate
+      - 5year: 5-year T-note rate
+      - 10year: 10-year T-note rate (benchmark long-term rate)
+      - 30year: 30-year T-bond rate
+
+  frequency:
+    type: str
+    required: false
+    default: "daily"
+    description: "Data frequency"
+    allowed: ["daily", "weekly", "monthly"]
+    notes: "Must match the frequency partition in curated data"
+
+output:
+  type: dataframe
+  description: |
+    US Treasury rate data with columns: date, rate_type, series_id, rate, frequency, source
+
+    Returns a DataFrame with risk-free rates for the specified period and maturities.
+
+  columns:
+    - date
+    - rate_type
+    - series_id
+    - rate
+    - frequency
+    - source
+
+examples:
+  - description: "Load 3-month T-bill rates for CAPM"
+    usage: |
+      Task(
+          id="LoadRiskFreeRate",
+          run=run_loader(
+              "qx_loaders/us_treasury_rate",
+              overrides={
+                  "start_date": "2014-01-01",
+                  "end_date": "2024-12-31",
+                  "rate_types": ["3month"],
+                  "frequency": "daily"
+              }
+          ),
+          deps=["BuildTreasuryRates"]
+      )
+
+  - description: "Load multiple maturities for term structure analysis"
+    usage: |
+      Task(
+          id="LoadYieldCurve",
+          run=run_loader(
+              "qx_loaders/us_treasury_rate",
+              overrides={
+                  "start_date": "2020-01-01",
+                  "end_date": "2024-12-31",
+                  "rate_types": ["3month", "1year", "5year", "10year", "30year"],
+                  "frequency": "daily"
+              }
+          ),
+          deps=["BuildTreasuryRates"]
+      )

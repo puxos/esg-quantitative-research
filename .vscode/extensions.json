@@ -1,0 +1,34 @@
+{
+  "recommendations": [
+    // Python Development
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.black-formatter",
+
+    // Azure Development
+    "ms-azuretools.vscode-azurefunctions",
+    "ms-azuretools.vscode-docker",
+    "ms-vscode.azure-account",
+    "ms-azuretools.vscode-azurecontainerapps",
+    "ms-azuretools.vscode-azurestorage",
+    "ms-azuretools.azure-dev",
+    "ms-azuretools.vscode-bicep",
+
+    // AI Assistance
+    "GitHub.copilot",
+    "GitHub.copilot-chat",
+
+    // Configuration & Data Formats
+    "tamasfe.even-better-toml",
+    "redhat.vscode-yaml",
+    "esbenp.prettier-vscode",
+
+    // Documentation
+    "DavidAnson.vscode-markdownlint",
+    "streetsidesoftware.code-spell-checker",
+
+    // Code Quality
+    "EditorConfig.EditorConfig",
+    "eamodio.gitlens"
+  ]
+}

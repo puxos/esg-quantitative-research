@@ -1,0 +1,170 @@
+model:
+  id: two_factor_regression
+  version: 1.0.0
+  featureset_id: ohlcv_v1+esg_factors_v1+rf_v1
+  description: |
+    Two-Factor OLS Regression: Market + ESG
+
+    Estimates factor exposures (betas) and Jensen's alpha using OLS regression:
+      Excess_Return = α + β_market * Market_Excess + β_ESG * ESG_Factor + ε
+
+    Where:
+      - Excess returns subtract risk-free rate
+      - Market excess: SPY returns minus risk-free rate
+      - ESG factor: Long-short ESG portfolio returns
+      - Betas measure sensitivity to each factor
+      - Alpha measures abnormal return (not explained by factors)
+
+    Statistical Inference:
+      - Uses Newey-West (HAC) standard errors
+      - Corrects for autocorrelation and heteroskedasticity
+      - Provides t-statistics and p-values for significance testing
+
+    Output:
+      - Cross-sectional (one beta per stock) if window=null
+      - Time-series (rolling betas) if window specified
+
+io:
+  inputs:
+    # Input 1: Stock prices (for individual stock returns)
+    - name: equity_prices
+      required: true
+      type:
+        domain: market-data
+        asset_class: equity
+        subdomain: ohlcv
+        region: US
+        frequency: D
+      description: "Daily stock OHLCV data (will be resampled to monthly)"
+
+    # Input 2: Market prices (SPY for market returns)
+    - name: market_prices
+      required: true
+      type:
+        domain: market-data
+        asset_class: equity
+        subdomain: ohlcv
+        region: US
+        frequency: D
+      description: "Daily SPY OHLCV data (market proxy, will be resampled to monthly)"
+
+    # Input 3: ESG factors (from ESGFactorModel)
+    - name: esg_factors
+      required: true
+      type:
+        domain: derived-metrics
+        asset_class: equity
+        subdomain: esg_factors
+        region: null
+        frequency: null
+      description: "Monthly ESG factor returns (output from ESGFactorModel)"
+
+    # Input 4: Risk-free rate
+    - name: risk_free
+      required: true
+      type:
+        domain: reference-rates
+        asset_class: null
+        subdomain: zero_rate
+        region: US
+        frequency: D
+      description: "Daily risk-free rates (will be resampled to monthly)"
+
+  output:
+    type:
+      domain: derived-metrics
+      asset_class: equity
+      subdomain: two_factor_betas
+      region: null
+      frequency: null
+    description: |
+      Factor exposures (betas) and alpha from two-factor regression.
+
+      Cross-sectional output (window=null):
+        - One row per stock with full-sample estimates
+        - Columns: symbol, alpha, beta_market, beta_esg, statistics
+
+      Time-series output (window specified):
+        - Multiple rows per stock (rolling window estimates)
+        - Columns: symbol, date, alpha, beta_market, beta_esg, statistics
+
+parameters:
+  esg_factor_name:
+    type: enum
+    default: "ESG"
+    allowed: ["ESG", "E", "S", "G", "ESG_mom"]
+    description: |
+      Which ESG factor to use in the regression.
+      - ESG: Composite ESG score factor (default)
+      - E/S/G: Individual pillar factors
+      - ESG_mom: ESG momentum factor
+
+  window_months:
+    type: int
+    default: null
+    min: 36
+    max: 120
+    description: |
+      Rolling window size in months (null = full sample).
+      - null: Single cross-sectional regression (one beta per stock)
+      - 36-120: Rolling window (time-series of betas)
+      Minimum 36 months for statistical robustness.
+
+  min_observations:
+    type: int
+    default: 36
+    min: 24
+    max: 60
+    description: |
+      Minimum number of monthly observations required.
+      Default 36 = 3 years (standard for monthly factor models)
+
+  use_hac_se:
+    type: bool
+    default: true
+    description: |
+      Use Newey-West (HAC) standard errors.
+      - true: Corrects for autocorrelation and heteroskedasticity (recommended)
+      - false: Use OLS standard errors (assumes i.i.d. errors)
+
+  hac_maxlags:
+    type: int
+    default: 12
+    min: 1
+    max: 24
+    description: |
+      Maximum lags for Newey-West HAC covariance.
+      Default 12 for monthly data (captures annual seasonality).
+      Rule: floor(4 * (T/100)^(2/9)) per Newey & West (1994)
+
+metadata:
+  author: Qx System
+  created: 2025-12-04
+  tags:
+    - regression
+    - factor-models
+    - market-beta
+    - esg-beta
+    - ols
+
+  references:
+    - "Fama & French (1993): Common risk factors in the returns on stocks and bonds"
+    - "Carhart (1997): On persistence in mutual fund performance"
+    - "Pastor, Stambaugh & Taylor (2021): Sustainable investing in equilibrium"
+    - "Newey & West (1987): A simple, positive semi-definite, heteroskedasticity and autocorrelation consistent covariance matrix"
+
+  notes: |
+    This model migrates from legacy TwoFactorRegression (src/programs/two_factor_regression.py)
+    to the Qx BaseModel architecture.
+
+    Key improvements:
+    - Declarative configuration (model.yaml)
+    - Automatic input loading from processed ESG factors
+    - Type-safe dataset contracts
+    - Supports both cross-sectional and time-series analysis
+
+    Interpretation:
+    - α (alpha): Abnormal return not explained by factors (monthly)
+    - β_market: Sensitivity to market movements (1.0 = market average)
+    - β_ESG: Sensitivity to ESG factor (positive = ESG tilt)
+    - Statistical significance: t-stat >2 or p-value <0.05

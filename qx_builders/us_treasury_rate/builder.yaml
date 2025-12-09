@@ -1,0 +1,124 @@
+# US Treasury Rate Builder Configuration
+# Fetches US Treasury rates from FRED API
+
+builder:
+  id: us_treasury_rate
+  version: 1.0.0
+  description: |
+    Fetches US Treasury constant maturity rates from Federal Reserve Economic Data (FRED).
+    Supports multiple maturities (3-month through 30-year) with batch processing.
+
+# Input/Output specification
+io:
+  output:
+    type:
+      domain: reference-rates
+      asset_class: null
+      subdomain: treasury_rate
+      region: US
+      frequency: daily
+
+# Builder parameters
+parameters:
+  # Date range
+  start_date:
+    type: string
+    required: false
+    default: "2020-01-01"
+    description: Start date for data fetch (YYYY-MM-DD)
+    example: "2020-01-01"
+
+  end_date:
+    type: string
+    required: false
+    default: null  # null = today
+    description: End date for data fetch (YYYY-MM-DD), null for today
+    example: "2024-12-31"
+
+  # Rate types to fetch
+  rate_types:
+    type: list
+    required: false
+    default: ["3month", "1year", "5year", "10year", "30year"]
+    description: List of treasury maturities to fetch
+    allowed_values: ["3month", "1year", "5year", "10year", "30year"]
+    example: ["3month", "10year"]
+
+  # FRED API authentication
+  fred_api_key:
+    type: string
+    required: false
+    default: null  # Will use FRED_API_KEY environment variable
+    description: FRED API key (or set FRED_API_KEY env var)
+    example: "abc123def456..."
+
+  # Data frequency
+  frequency:
+    type: string
+    required: false
+    default: "daily"
+    description: Target data frequency (daily, weekly, monthly)
+    allowed_values: ["daily", "weekly", "monthly"]
+    example: "daily"
+
+  # Regional metadata
+  region:
+    type: string
+    required: false
+    default: "US"
+    description: Region identifier (currently only US supported)
+    allowed_values: ["US"]
+    example: "US"
+
+  # Error handling
+  fail_on_error:
+    type: boolean
+    required: false
+    default: false
+    description: If true, fail on any rate fetch error; if false, skip failed rates
+
+# Partition requirements
+partitions:
+  required:
+    - region
+    - frequency
+  defaults:
+    region: US
+    frequency: daily
+
+# Metadata
+metadata:
+  author: Qx Team
+  created: 2024-11-25
+  data_source: Federal Reserve Economic Data (FRED)
+  api_docs: https://fred.stlouisfed.org/docs/api/
+  api_key_signup: https://fred.stlouisfed.org/docs/api/api_key.html
+
+  dependencies:
+    - requests
+    - tenacity
+
+  notes: |
+    Fetches US Treasury constant maturity rates from FRED API.
+
+    Rate types and FRED series mapping:
+      - 3month: DGS3MO (3-Month Treasury Constant Maturity)
+      - 1year: DGS1 (1-Year Treasury Constant Maturity)
+      - 5year: DGS5 (5-Year Treasury Constant Maturity)
+      - 10year: DGS10 (10-Year Treasury Constant Maturity)
+      - 30year: DGS30 (30-Year Treasury Constant Maturity)
+
+    Data availability:
+      - Historical data from 1960s to present
+      - Daily frequency (market days only)
+      - Missing values on weekends/holidays
+
+    API key:
+      - Free registration at https://fred.stlouisfed.org/docs/api/api_key.html
+      - Can be provided as parameter or FRED_API_KEY environment variable
+
+    Batch processing:
+      - Builder fetches all specified rate_types in one run
+      - Auto-partitions by rate_type during write
+      - Efficient for building complete rate curves
+

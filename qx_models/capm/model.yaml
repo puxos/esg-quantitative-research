@@ -1,0 +1,42 @@
+model:
+  id: capm
+  version: 1.0.0
+  featureset_id: ohlcv_v1+rf_v1
+  description: "CAPM expected return using daily OHLCV and daily risk-free"
+
+io:
+  inputs:
+    - name: equity_prices
+      required: true
+      type:
+        domain: market-data
+        asset_class: equity
+        subdomain: ohlcv
+        region: US
+        frequency: D
+    - name: risk_free
+      required: true
+      type:
+        domain: reference-rates
+        asset_class: null
+        subdomain: zero_rate
+        region: US
+        frequency: D
+  output:
+    type:
+      domain: derived-metrics
+      asset_class: equity
+      subdomain: predictions
+      region: null
+      frequency: null
+
+parameters:
+  horizon_d:
+    type: int
+    default: 252
+    min: 1
+    max: 2520
+  beta_method:
+    type: enum
+    default: "simple"
+    allowed: ["simple", "rolling_ols", "exponential"]

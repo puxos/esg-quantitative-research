@@ -1,0 +1,43 @@
+builder:
+  id: sp500_membership
+  version: 1.0.0
+  description: "S&P 500 historical membership builder - transforms raw CSV into curated daily membership data"
+
+io:
+  inputs:
+    - name: raw_csv
+      type: file
+      description: "Raw S&P 500 historical components CSV file"
+
+  output:
+    type:
+      domain: membership
+      asset_class: null
+      subdomain: daily
+      region: null
+      frequency: null
+
+parameters:
+  min_date:
+    type: string
+    default: "2000-01-01"
+    description: "Minimum date to include in curated output (ISO format YYYY-MM-DD)"
+
+  raw_data_root:
+    type: string
+    default: "./raw"
+    description: "Root directory for raw data files (relative to package)"
+
+  membership_filename:
+    type: string
+    default: "S&P 500 Historical Components & Changes(11-16-2025).csv"
+    description: "Name of the raw CSV file"
+
+partitions:
+  required:
+    - universe
+    - mode
+
+  defaults:
+    universe: sp500
+    mode: daily

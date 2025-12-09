@@ -1,0 +1,56 @@
+loader:
+  id: historic_members
+  version: 1.0.0
+  description: "Get all symbols that were members of a universe during a period (including removed members)"
+
+inputs:
+  - name: membership_data
+    required: true
+    type:
+      domain: membership
+      subdomain: intervals
+    description: "Membership interval data"
+
+parameters:
+  start_date:
+    type: str
+    required: true
+    description: "Period start date (YYYY-MM-DD)"
+    example: "2014-01-01"
+
+  end_date:
+    type: str
+    required: true
+    description: "Period end date (YYYY-MM-DD)"
+    example: "2024-12-31"
+
+  universe:
+    type: str
+    default: "sp500"
+    description: "Universe identifier"
+    allowed: ["sp500", "russell1000", "nasdaq100"]
+
+  use_ticker_mapper:
+    type: bool
+    default: true
+    description: |
+      Whether to consolidate ticker changes to current symbols.
+      If true: Maps old tickers to current ones (FB → META)
+      If false: Returns all ticker symbols as-is (both FB and META)
+    notes: |
+      When enabled, companies that changed tickers will appear only once
+      under their current ticker. Useful for:
+      - Counting unique companies (not unique ticker symbols)
+      - Avoiding duplicate positions in portfolios
+      - Data fetching (Tiingo migrates data to new tickers)
+
+output:
+  type: list
+  item_type: str
+  description: |
+    List of ticker symbols that were members at ANY point during the period.
+    Eliminates survivorship bias by including:
+    - Current members
+    - Removed members (delisted, acquired, merged)
+    - Stocks that joined and left during the period
+  example: ["AAPL", "MSFT", "GOOGL", "FOX", "TWX", ...]

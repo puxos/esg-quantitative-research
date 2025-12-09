@@ -1,0 +1,37 @@
+loader:
+  id: continuous_universe
+  version: 1.0.0
+  description: "Select symbols that were continuously in a universe during a period"
+
+inputs:
+  - name: membership_data
+    required: true
+    type:
+      domain: membership
+      subdomain: intervals
+    description: "Membership interval data"
+
+parameters:
+  start_date:
+    type: str
+    required: true
+    description: "Period start date (YYYY-MM-DD)"
+    example: "2014-01-01"
+
+  end_date:
+    type: str
+    required: true
+    description: "Period end date (YYYY-MM-DD)"
+    example: "2024-12-31"
+
+  universe:
+    type: str
+    default: "sp500"
+    description: "Universe identifier"
+    allowed: ["sp500", "russell1000", "nasdaq100"]
+
+output:
+  type: list
+  item_type: str
+  description: "List of ticker symbols that were continuously in the universe"
+  example: ["AAPL", "MSFT", "GOOGL", ...]

@@ -1,0 +1,163 @@
+model:
+  id: esg_factor
+  version: 1.0.0
+  featureset_id: ohlcv_v1+esg_v1+rf_v1
+  description: |
+    Construct ESG long-short factor portfolios based on ESG scores and momentum signals.
+
+    Factor Construction:
+    - ESG Factor: Long-short portfolio based on ESG composite scores
+    - E/S/G Factors: Long-short portfolios based on individual pillar scores
+    - ESG Momentum Factor: Long-short portfolio based on changes in ESG scores
+
+    Portfolio Construction:
+    - Ranks stocks by signal (cross-sectional or sector-neutral)
+    - Long top quantile (e.g., top 20%)
+    - Short bottom quantile (e.g., bottom 20%)
+    - Equal-weighted or value-weighted legs
+    - Signal at t-1 used to form portfolios earning returns at t
+
+    Timing Convention:
+    - Uses 12-month ESG lag to avoid look-ahead bias
+    - Month t ESG score → used for month t+12 trading
+    - Conservative: maximizes lag, minimizes look-ahead risk
+
+io:
+  inputs:
+    # Input 1: Price data (curated) - for returns calculation
+    - name: equity_prices
+      required: true
+      type:
+        domain: market-data
+        asset_class: equity
+        subdomain: ohlcv
+        region: US
+        frequency: D
+      description: "Daily OHLCV price data (will be resampled to monthly)"
+
+    # Input 2: ESG scores (curated)
+    - name: esg_scores
+      required: true
+      type:
+        domain: esg
+        asset_class: equity
+        subdomain: esg_scores
+        region: null
+        frequency: null
+      description: "Annual ESG scores (esg_year with 'year' column for availability)"
+
+    # Input 3: Risk-free rate (curated)
+    - name: risk_free
+      required: true
+      type:
+        domain: reference-rates
+        asset_class: null
+        subdomain: zero_rate
+        region: US
+        frequency: D
+      description: "Daily risk-free rates (will be resampled to monthly)"
+
+    # Input 4: Universe filter (optional processed)
+    - name: universe_filter
+      required: false
+      type:
+        domain: derived-metrics
+        asset_class: equity
+        subdomain: universe_filter
+        region: null
+        frequency: null
+      description: |
+        Optional universe filter from UniverseFilterModel.
+        If provided, will filter all inputs to tickers that passed_filter=True.
+        Enables automatic filtering to ESG-continuous universe.
+
+  output:
+    type:
+      domain: derived-metrics
+      asset_class: equity
+      subdomain: esg_factors
+      region: null
+      frequency: null
+    description: |
+      Monthly ESG factor returns (excess returns, risk-free adjusted).
+
+      Output columns: date, factor_name, factor_return, long_return, short_return
+
+      Factor names:
+      - ESG: Composite ESG score factor
+      - E: Environmental pillar factor
+      - S: Social pillar factor
+      - G: Governance pillar factor
+      - ESG_mom: ESG momentum factor (YoY changes)
+
+parameters:
+  quantile:
+    type: float
+    default: 0.2
+    min: 0.05
+    max: 0.5
+    description: "Quantile for long/short legs (0.2 = top/bottom 20%)"
+
+  sector_neutral:
+    type: bool
+    default: false
+    description: "Whether to rank within sectors (true) or cross-sectional (false)"
+
+  lag_signal:
+    type: int
+    default: 1
+    min: 0
+    max: 12
+    description: "Number of periods to lag signal (default: 1 month)"
+
+  weighting:
+    type: enum
+    default: "equal"
+    allowed: ["equal", "value"]
+    description: |
+      Portfolio weighting scheme:
+      - equal: Each stock gets 1/N weight (academic standard)
+      - value: Market cap weighted (practitioner standard)
+
+  esg_annual_lag:
+    type: int
+    default: 12
+    min: 0
+    max: 24
+    description: |
+      Months to lag ESG scores to avoid look-ahead bias.
+      Default 12 = conservative 1-year lag (month t-12 score → month t trading)
+
+  return_legs:
+    type: bool
+    default: true
+    description: "Whether to return separate long/short leg returns (for analysis)"
+
+metadata:
+  author: Qx System
+  created: 2025-12-04
+  tags:
+    - esg
+    - factors
+    - long-short
+    - portfolio
+
+  references:
+    - "Luo & Balvers (2017): Social screens and systematic investor boycott risk"
+    - "Pastor, Stambaugh & Taylor (2021): Sustainable investing in equilibrium"
+    - "Fama & French (1993): Common risk factors in returns on stocks and bonds"
+
+  notes: |
+    This model migrates from legacy ESGFactorBuilder (src/esg/esg_factor.py)
+    to the Qx BaseModel architecture.
+
+    Key improvements:
+    - Declarative configuration (model.yaml)
+    - Automatic input loading and output writing
+    - Type-safe dataset contracts
+    - Integrated with Qx pipeline system
+
+    Timing Convention:
+    - ESG scores lagged by 12 months (uniform shift)
+    - Avoids look-ahead bias while maintaining calendar-year mapping
+    - Conservative approach standard in academic factor research

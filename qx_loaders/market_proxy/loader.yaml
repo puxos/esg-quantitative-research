@@ -1,0 +1,67 @@
+# Market Proxy Loader Configuration
+# ==================================
+#
+# Loads market proxy OHLCV price data (e.g., SPY) for use in factor models,
+# benchmarking, and risk calculations.
+
+loader:
+  id: market_proxy
+  version: 1.0.0
+  description: "Load market proxy OHLCV prices (SPY by default) for benchmarking and factor models"
+
+io:
+  inputs:
+    - name: ohlcv_data
+      required: true
+      type:
+        domain: market-data
+        asset_class: equity
+        subdomain: ohlcv
+        region: null
+        frequency: null  # Will be specified via parameters
+
+parameters:
+  start_date:
+    type: str
+    required: true
+    description: "Start date for market proxy data (YYYY-MM-DD)"
+    example: "2014-01-01"
+
+  end_date:
+    type: str
+    required: true
+    description: "End date for market proxy data (YYYY-MM-DD)"
+    example: "2024-12-31"
+
+  proxy_symbol:
+    type: str
+    required: false
+    default: "SPY"
+    description: "Market proxy ticker symbol"
+    allowed: ["SPY", "VTI", "IVV", "VOO"]
+
+  frequency:
+    type: str
+    required: false
+    default: "Daily"
+    description: "Data frequency"
+    allowed: ["Daily", "Weekly", "Monthly"]
+
+  exchange:
+    type: str
+    required: false
+    default: "US"
+    description: "Exchange for market proxy"
+
+output:
+  type: dataframe
+  description: "Market proxy OHLCV price data with columns: date, open, high, low, close, volume, adj_close"
+  columns:
+    - date
+    - symbol
+    - open
+    - high
+    - low
+    - close
+    - volume
+    - adj_close

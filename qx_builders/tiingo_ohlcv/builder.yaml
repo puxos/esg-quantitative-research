@@ -1,0 +1,120 @@
+builder:
+  id: tiingo_ohlcv
+  version: 1.0.0
+  description: "Tiingo OHLCV price data builder - fetches equity price data from Tiingo API"
+
+io:
+  inputs:
+    - name: tiingo_api
+      type: external
+      description: "Tiingo API for fetching price data"
+    - name: symbol_list
+      type: list
+      description: "List of ticker symbols to fetch (e.g., ['AAPL', 'MSFT', 'GOOGL'])"
+    - name: date_range
+      type: range
+      description: "Date range for historical data (start_date, end_date)"
+
+  output:
+    type:
+      domain: market-data
+      asset_class: equity
+      subdomain: ohlcv
+      frequency: null  # Parameterized via partitions
+
+parameters:
+  start_date:
+    type: string
+    default: "2020-01-01"
+    description: "Start date for fetching price data (ISO format YYYY-MM-DD)"
+
+  end_date:
+    type: string
+    default: null
+    description: "End date for fetching price data (ISO format YYYY-MM-DD). null = today"
+
+  symbols:
+    type: list
+    default: []
+    description: "List of ticker symbols to fetch. Example: ['AAPL', 'MSFT', 'GOOGL']"
+
+  market_proxy_symbols:
+    type: list
+    default: ["SPY"]
+    description: "Market proxy symbols (e.g., SPY, VTI) - automatically included in fetch batch"
+
+  frequency:
+    type: enum
+    default: "daily"
+    allowed: ["daily", "weekly", "monthly", "yearly"]
+    description: "Data frequency (daily, weekly, monthly, yearly)"
+
+  tiingo_api_key:
+    type: string
+    default: null
+    description: "Tiingo API key (or use TIINGO_API_KEY env var)"
+
+  exchange:
+    type: string
+    default: "US"
+    description: "Exchange identifier (e.g., US, NYSE, NASDAQ)"
+
+  currency:
+    type: string
+    default: "USD"
+    description: "Currency code (e.g., USD, HKD)"
+
+  use_ticker_mapper:
+    type: bool
+    default: true
+    description: "Enable ticker resolution (FB→META, CBS→PARA, etc.)"
+
+  batch_size:
+    type: int
+    default: 50
+    min: 1
+    max: 1000
+    description: "Number of symbols to process in parallel batches"
+
+  fail_on_error:
+    type: bool
+    default: false
+    description: "Stop entire build if any symbol fails (false = skip and continue)"
+
+  apply_date_correction:
+    type: bool
+    default: true
+    description: "Apply date buffer for trading day alignment (adds tolerance before/after requested dates)"
+
+  tolerance_days:
+    type: string
+    default: null
+    description: "Custom tolerance in days (null = auto-calculate based on frequency: D=2, W=6, M=3)"
+
+partitions:
+  required:
+    - exchange
+    - frequency
+
+  defaults:
+    exchange: US
+    frequency: Daily
+
+examples:
+  - description: "Fetch daily prices for tech stocks (2020-2024)"
+    partitions:
+      exchange: US
+      frequency: Daily
+    overrides:
+      start_date: "2020-01-01"
+      end_date: "2024-12-31"
+      symbols: ["AAPL", "MSFT", "GOOGL", "AMZN", "META"]
+
+  - description: "Fetch monthly prices for S&P 500 (2014 only)"
+    partitions:
+      exchange: US
+      frequency: Monthly
+    overrides:
+      start_date: "2014-01-01"
+      end_date: "2014-12-31"
+      symbols: []  # Load from membership data

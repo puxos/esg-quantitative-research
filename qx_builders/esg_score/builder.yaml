@@ -1,0 +1,65 @@
+# ESG Score Builder Configuration
+# Builds ESG scores from local Excel/CSV files with GVKEY mapping
+
+builder:
+  id: esg_score
+  version: 1.0.0
+  description: |
+    Fetches ESG (Environmental, Social, Governance) scores from local files.
+    Maps GVKEY company identifiers to ticker symbols and resolves corporate actions.
+    Supports batch processing by year range.
+
+# Input/Output specification
+io:
+  output:
+    type:
+      domain: esg
+      asset_class: equity
+      subdomain: esg_scores
+      region: null
+      frequency: yearly  # ESG scores are annual (one record per company per year)
+
+# Builder parameters
+parameters:
+  esg_source_path:
+    type: string
+    default: "./raw/data_matlab_ESG_withSIC.xlsx"
+    description: "Path to ESG data file (Excel or CSV, relative to package)"
+
+  start_year:
+    type: int
+    default: null
+    description: |
+      Start CALENDAR year for ESG data (null = auto-detect from data).
+      This is the TRADING period start year. The builder will fetch ESG year = start_year - 1
+      to avoid look-ahead bias (e.g., calendar 2014 uses ESG year 2013).
+
+  end_year:
+    type: int
+    default: null
+    description: |
+      End CALENDAR year for ESG data (null = auto-detect from data).
+      This is the TRADING period end year. The builder will fetch ESG year = end_year - 1
+      to avoid look-ahead bias (e.g., calendar 2024 uses ESG year 2023).
+
+  exchange:
+    type: enum
+    default: "US"
+    allowed: ["US", "HK"]
+    description: "Exchange for GVKEY mapping (US or HK)"
+
+  use_ticker_mapper:
+    type: bool
+    default: true
+    description: "Use TickerMapper to resolve ticker transitions (FB→META, etc.)"
+
+  fail_on_missing_mapping:
+    type: bool
+    default: false
+    description: "Fail if GVKEY mapping not found (strict mode)"
+
+# Partition requirements
+partitions:
+  required: [exchange]
+  defaults:
+    exchange: US

@@ -1,0 +1,11 @@
+"""
+Two-Factor Regression Model
+
+Performs OLS regression to estimate factor exposures (market beta and ESG beta):
+    R_i,t - RF_t = α_i + β_market * (R_market,t - RF_t) + β_ESG * ESG_factor_t + ε_i,t
+"""
+
+from .model import TwoFactorRegressionModel
+from .schema import get_two_factor_betas_contract
+
+__all__ = ["TwoFactorRegressionModel", "get_two_factor_betas_contract"]
