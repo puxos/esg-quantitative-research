@@ -56,7 +56,7 @@ from typing import List
 
 import pandas as pd
 
-from qx.common.types import AssetClass, DatasetType, Domain, Frequency
+from qx.common.types import AssetClass, DatasetType, Domain, Subdomain, Frequency
 from qx.foundation.base_loader import BaseLoader
 
 
@@ -119,7 +119,7 @@ class ESGPanelLoader(BaseLoader):
         esg_type = DatasetType(
             domain=Domain.ESG,
             asset_class=AssetClass.EQUITY,
-            subdomain="esg_scores",
+            subdomain=Subdomain.ESG_SCORES,
             region=None,
             frequency=Frequency.YEARLY,
         )

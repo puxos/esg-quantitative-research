@@ -33,7 +33,7 @@ def align_start_date_to_frequency(start_date: date, frequency: str) -> date:
 
     Args:
         start_date: Requested start date
-        frequency: Data frequency ('daily', 'weekly', 'monthly', 'D', 'W', 'M')
+        frequency: Data frequency ('daily', 'weekly', 'monthly')
 
     Returns:
         Aligned start date appropriate for the frequency
@@ -48,7 +48,7 @@ def align_start_date_to_frequency(start_date: date, frequency: str) -> date:
     """
     frequency = frequency.lower()
 
-    if frequency in ("monthly", "m"):
+    if frequency == "monthly":
         # Align to end of month
         # Move to first day of next month, then back one day
         if start_date.month == 12:
@@ -57,7 +57,7 @@ def align_start_date_to_frequency(start_date: date, frequency: str) -> date:
             next_month = start_date.replace(month=start_date.month + 1, day=1)
         return next_month - timedelta(days=1)
 
-    elif frequency in ("weekly", "w"):
+    elif frequency == "weekly":
         # Align to end of week (Friday)
         # If start date is not Friday, move to next Friday
         days_until_friday = (4 - start_date.weekday()) % 7  # 4 = Friday
@@ -81,7 +81,7 @@ def get_tolerance_for_frequency(frequency: str) -> int:
     For monthly data: Allow ±3 days tolerance (month-end vs first/last trading day)
 
     Args:
-        frequency: Data frequency ('daily', 'weekly', 'monthly', 'D', 'W', 'M')
+        frequency: Data frequency ('daily', 'weekly', 'monthly')
 
     Returns:
         Tolerance in days
@@ -93,16 +93,14 @@ def get_tolerance_for_frequency(frequency: str) -> int:
         6
         >>> get_tolerance_for_frequency('monthly')
         3
-        >>> get_tolerance_for_frequency('D')
-        2
     """
     frequency = frequency.lower()
 
-    if frequency in ("daily", "d"):
+    if frequency == "daily":
         return DAILY_TOLERANCE_DAYS
-    elif frequency in ("weekly", "w"):
+    elif frequency == "weekly":
         return WEEKLY_TOLERANCE_DAYS
-    elif frequency in ("monthly", "m"):
+    elif frequency == "monthly":
         return MONTHLY_TOLERANCE_DAYS
     else:
         # Unknown frequency, use daily default

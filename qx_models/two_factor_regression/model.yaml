@@ -34,7 +34,7 @@ io:
         asset_class: equity
         subdomain: ohlcv
         region: US
-        frequency: D
+        frequency: daily
       description: "Daily stock OHLCV data (will be resampled to monthly)"
 
     # Input 2: Market prices (SPY for market returns)
@@ -45,7 +45,7 @@ io:
         asset_class: equity
         subdomain: ohlcv
         region: US
-        frequency: D
+        frequency: daily
       description: "Daily SPY OHLCV data (market proxy, will be resampled to monthly)"
 
     # Input 3: ESG factors (from ESGFactorModel)

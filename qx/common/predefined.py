@@ -25,21 +25,21 @@ def seed_registry(reg: DatasetRegistry):
     for freq in (Frequency.DAILY, Frequency.WEEKLY, Frequency.MONTHLY):
         reg.register(get_tiingo_ohlcv_contract(exchange="US", frequency=freq))
 
-    # Risk-free rates - use schema functions from us_treasury_rate package
+    # Risk-free rates - US Treasury yield curves
     # US: FRED Treasury rates (DGS3MO, DGS1, DGS5, DGS10, DGS30)
-    # Future: Add other countries (e.g., HK HIBOR, UK Gilts)
-    # Register contract for each frequency (rate_type is in partitions, not in type)
+    # Region is hardcoded (US), frequency is partitioned (daily/weekly/monthly)
+    # Register one contract per frequency for contract identity
     from dataclasses import replace
 
     for freq in (Frequency.DAILY, Frequency.WEEKLY, Frequency.MONTHLY):
         base_contract = get_us_treasury_rate_contract()
-        # Create new contract with updated frequency in dataset_type
+        # Create contract with specific frequency in dataset_type
         updated_type = DatasetType(
             domain=base_contract.dataset_type.domain,
             asset_class=base_contract.dataset_type.asset_class,
             subdomain=base_contract.dataset_type.subdomain,
-            region=base_contract.dataset_type.region,
-            frequency=freq,
+            region=base_contract.dataset_type.region,  # US (hardcoded)
+            frequency=freq,  # Vary by frequency
         )
         contract = replace(base_contract, dataset_type=updated_type)
         reg.register(contract)

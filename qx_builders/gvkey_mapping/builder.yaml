@@ -4,11 +4,6 @@ builder:
   description: "GVKEY-ticker mapping builder - creates mapping from GVKEY identifiers to ticker symbols"
 
 io:
-  inputs:
-    - name: crsp_file
-      type: file
-      description: "CRSP data file containing GVKEY-ticker mappings"
-
   output:
     type:
       domain: metadata

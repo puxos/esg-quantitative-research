@@ -26,7 +26,7 @@ from typing import List
 
 import pandas as pd
 
-from qx.common.types import DatasetType, Domain
+from qx.common.types import DatasetType, Domain, Subdomain
 from qx.foundation.base_loader import BaseLoader
 
 
@@ -62,7 +62,7 @@ class UniverseAtDateLoader(BaseLoader):
         membership_type = DatasetType(
             domain=Domain.MEMBERSHIP,
             asset_class=None,
-            subdomain="intervals",
+            subdomain=Subdomain.INTERVALS,
             region=None,
             frequency=None,
         )

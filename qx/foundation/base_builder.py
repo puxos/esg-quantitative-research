@@ -2,111 +2,117 @@ import abc
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 import yaml
 
 from qx.common.contracts import DatasetContract, DatasetRegistry
-from qx.common.types import AssetClass, DatasetType, Domain, Frequency, Region
+from qx.common.enum_validator import (
+    EnumValidationError,
+    validate_dataset_type_config,
+    validate_frequency_parameter,
+)
+from qx.common.types import (
+    AssetClass,
+    DatasetType,
+    Domain,
+    Frequency,
+    Region,
+    Subdomain,
+)
 from qx.storage.pathing import PathResolver
 from qx.storage.table_format import TableFormatAdapter
 
 
-def _enum(cls, val):
-    """Helper to convert string/None to enum value."""
-    if val is None:
-        return None
-    for e in cls:
-        if e.value == val or e.name == val:
-            return e
-    raise ValueError(f"Unknown {cls.__name__}: {val}")
-
-
 def dt_from_cfg(d: Dict) -> DatasetType:
-    """Convert YAML config dict to DatasetType."""
-    return DatasetType(
-        _enum(Domain, d["domain"]),
-        _enum(AssetClass, d.get("asset_class")),
-        d.get("subdomain"),
-        _enum(Region, d.get("region")),
-        _enum(Frequency, d.get("frequency")),
-    )
+    """
+    Convert YAML config dict to DatasetType with strict enum validation.
+
+    Raises:
+        EnumValidationError: If any enum value is invalid
+    """
+    try:
+        validated = validate_dataset_type_config(d)
+        return DatasetType(
+            domain=validated["domain"],
+            asset_class=validated["asset_class"],
+            subdomain=validated["subdomain"],
+            region=validated["region"],
+            frequency=validated["frequency"],
+        )
+    except EnumValidationError as e:
+        raise ValueError(
+            f"Invalid dataset type configuration in builder.yaml:\n{str(e)}\n"
+            f"Check your io.output.type section in builder.yaml"
+        )
 
 
 class DataBuilderBase(abc.ABC):
     """
     Base class for data builders (raw → curated).
 
-    Supports both legacy constructor (contract, adapter, resolver) and
-    new YAML-based constructor (package_dir, registry, adapter, resolver, overrides).
+    YAML-based initialization only - reads configuration from builder.yaml.
+    Use with run_builder() factory for DAG orchestration.
     """
 
     def __init__(
         self,
-        contract: Optional[DatasetContract] = None,
-        adapter: Optional[TableFormatAdapter] = None,
-        resolver: Optional[PathResolver] = None,
-        package_dir: Optional[str] = None,
-        registry: Optional[DatasetRegistry] = None,
+        package_dir: str,
+        registry: DatasetRegistry,
+        adapter: TableFormatAdapter,
+        resolver: PathResolver,
         overrides: Optional[Dict] = None,
     ):
         """
-        Initialize builder with either legacy args or YAML-based config.
+        Initialize builder from YAML configuration.
 
-        Legacy mode (backward compatible):
-            contract, adapter, resolver
-
-        YAML mode (new):
-            package_dir, registry, adapter, resolver, overrides
+        Args:
+            package_dir: Path to builder package containing builder.yaml
+            registry: Dataset registry for resolving contracts
+            adapter: Table format adapter for writing curated data
+            resolver: Path resolver for output paths
+            overrides: Parameter overrides (e.g., {"symbols": ["AAPL"], "start_date": "2020-01-01"})
         """
-        # YAML mode: load builder.yaml from package_dir
-        if package_dir is not None:
-            self.package_dir = Path(package_dir)
-            yaml_path = self.package_dir / "builder.yaml"
-            if not yaml_path.exists():
-                raise FileNotFoundError(f"builder.yaml not found in {package_dir}")
+        # Load builder.yaml from package_dir
+        self.package_dir = Path(package_dir)
+        yaml_path = self.package_dir / "builder.yaml"
+        if not yaml_path.exists():
+            raise FileNotFoundError(f"builder.yaml not found in {package_dir}")
 
-            with open(yaml_path, "r") as f:
-                cfg = yaml.safe_load(f)
+        with open(yaml_path, "r") as f:
+            cfg = yaml.safe_load(f)
 
-            self.info = cfg["builder"]
-            self.output_dt_template = dt_from_cfg(cfg["io"]["output"]["type"])
-            self.params = self._resolve_params(
-                cfg.get("parameters", {}), overrides or {}
-            )
-            self.partition_spec = cfg.get("partitions", {})
+        self.info = cfg["builder"]
+        self.output_dt_template = dt_from_cfg(cfg["io"]["output"]["type"])
+        self.params = self._resolve_params(cfg.get("parameters", {}), overrides or {})
+        self.partition_spec = cfg.get("partitions", {})
 
-            # Resolve relative paths in parameters (relative to package directory)
-            self._resolve_relative_paths()
+        # Resolve relative paths in parameters (relative to package directory)
+        self._resolve_relative_paths()
 
-            # Store registry for later contract resolution (in build())
-            if registry is None:
-                raise ValueError("registry required for YAML-based builder")
-            self.registry = registry
-            self.adapter = adapter
-            self.resolver = resolver
+        # Store components
+        self.registry = registry
+        self.adapter = adapter
 
-            # Contract will be resolved in build() with actual partition values
-            self.contract = None
+        # Apply mode override if specified in builder.yaml
+        # This allows packages to force a specific mode (e.g., reference data always uses prod)
+        package_mode = self.info.get("mode")
+        if (
+            package_mode
+            and resolver is not None
+            and hasattr(resolver, "mode")
+            and resolver.mode != package_mode
+        ):
+            # Create new resolver with overridden mode
+            from qx.storage.pathing import PathResolver
 
-        # Legacy mode: direct instantiation
+            self.resolver = PathResolver(mode=package_mode)
         else:
-            if contract is None or adapter is None or resolver is None:
-                raise ValueError(
-                    "Must provide either (package_dir, registry, adapter, resolver) "
-                    "or (contract, adapter, resolver)"
-                )
-            self.contract = contract
-            self.adapter = adapter
             self.resolver = resolver
-            self.output_dt_template = None
-            self.registry = None
-            self.params = {}
-            self.info = {}
-            self.output_dt = None
-            self.partition_spec = {}
-            self.registry = None
+
+        # Contract will be resolved in build() with actual partition values
+        self.contract = None
 
     def _resolve_params(self, spec: Dict, overrides: Dict) -> Dict:
         """Resolve parameters from spec + overrides (same logic as BaseModel)."""
@@ -162,37 +168,44 @@ class DataBuilderBase(abc.ABC):
     @abc.abstractmethod
     def transform_to_curated(self, raw_df: pd.DataFrame, **kwargs) -> pd.DataFrame: ...
 
-    def build(self, partitions: dict, **kwargs) -> str:
+    def build(self, partitions: dict, **kwargs) -> Union[str, List[str]]:
         """
         Execute the build pipeline: fetch → transform → write.
 
+        Args:
+            partitions: Partition values (e.g., {"exchange": "US", "frequency": "daily"})
+            **kwargs: Additional arguments passed to fetch_raw and transform_to_curated
+
         Returns:
-            Path to written curated data
+            Path(s) to written curated data
         """
-        # YAML mode: resolve contract with actual partition values (frequency)
-        if self.contract is None and self.registry is not None:
-            # Merge partition values into output_dt_template
+        # Resolve contract with actual partition values
+        if self.contract is None:
+            # Some fields may be null in template but provided in partitions
+            # (e.g., frequency is partition key but also part of contract identity)
             from qx.common.types import Frequency
 
-            # Get frequency from partitions
-            freq_str = partitions.get("frequency")
+            # Start with template
+            actual_dt = self.output_dt_template
 
-            # Convert to enum type
-            frequency = Frequency(freq_str) if freq_str else None
+            # If frequency is null in template but provided in partitions, resolve it
+            if actual_dt.frequency is None and "frequency" in partitions:
+                freq_str = partitions["frequency"]
+                frequency = Frequency(freq_str) if freq_str else None
 
-            # Create actual output_dt with resolved values
-            from qx.common.types import DatasetType
+                # Create resolved dataset type
+                from qx.common.types import DatasetType
 
-            actual_dt = DatasetType(
-                domain=self.output_dt_template.domain,
-                asset_class=self.output_dt_template.asset_class,
-                subdomain=self.output_dt_template.subdomain,
-                region=self.output_dt_template.region,  # Use region from template
-                frequency=frequency,
-                dims=self.output_dt_template.dims,
-            )
+                actual_dt = DatasetType(
+                    domain=actual_dt.domain,
+                    asset_class=actual_dt.asset_class,
+                    subdomain=actual_dt.subdomain,
+                    region=actual_dt.region,
+                    frequency=frequency,
+                    dims=actual_dt.dims,
+                )
 
-            # Find contract for actual dataset type
+            # Find contract for resolved dataset type
             self.contract = self.registry.find(actual_dt)
             if self.contract is None:
                 raise ValueError(f"No contract found for output type: {actual_dt}")
@@ -229,8 +242,12 @@ class DataBuilderBase(abc.ABC):
                 if len(missing_keys) == 1:
                     partition_copy[missing_keys[0]] = group_key
                 else:
+                    # group_key is a tuple when grouping by multiple keys
+                    group_key_tuple = (
+                        group_key if isinstance(group_key, tuple) else (group_key,)
+                    )
                     for i, key in enumerate(missing_keys):
-                        partition_copy[key] = group_key[i]
+                        partition_copy[key] = group_key_tuple[i]
 
                 # Write this partition
                 rel_dir = self.resolver.curated_dir(self.contract, partition_copy)

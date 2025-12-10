@@ -36,9 +36,7 @@ class USTreasuryRateBuilder(DataBuilderBase):
     Fetches treasury constant maturity rates (3-month, 1-year, 5-year, 10-year, 30-year)
     from Federal Reserve Economic Data (FRED) and transforms to curated format.
 
-    Supports two modes:
-    1. YAML mode: Initialized from builder.yaml with run_builder()
-    2. Legacy mode: Direct instantiation with explicit parameters
+    YAML-based initialization only - uses builder.yaml configuration.
 
     Naming: USTreasuryRateBuilder (US-specific)
     Future: HKTreasuryRateBuilder, UKTreasuryRateBuilder for other countries
@@ -48,76 +46,41 @@ class USTreasuryRateBuilder(DataBuilderBase):
 
     def __init__(
         self,
-        contract: Optional[DatasetContract] = None,
-        adapter: Optional[TableFormatAdapter] = None,
-        resolver: Optional[PathResolver] = None,
-        fred_api_key: Optional[str] = None,
-        # YAML mode parameters
-        package_dir: Optional[Path] = None,
-        registry: Optional[DatasetRegistry] = None,
+        package_dir: str,
+        registry: DatasetRegistry,
+        adapter: TableFormatAdapter,
+        resolver: PathResolver,
         overrides: Optional[Dict] = None,
     ):
         """
-        Initialize US Treasury Rate builder.
-
-        YAML mode (for DAG orchestration):
-            builder = USTreasuryRateBuilder(
-                package_dir=Path("qx_builders/us_treasury_rate"),
-                registry=registry,
-                adapter=adapter,
-                resolver=resolver,
-                overrides={"rate_types": ["10year"], "start_date": "2020-01-01"}
-            )
-
-        Legacy mode:
-            builder = USTreasuryRateBuilder(
-                contract=contract,
-                adapter=adapter,
-                resolver=resolver,
-                fred_api_key="your_fred_api_key"
-            )
+        Initialize US Treasury Rate builder from YAML configuration.
 
         Args:
-            contract: Dataset contract (legacy mode)
-            adapter: Storage adapter for writing data
+            package_dir: Path to builder package containing builder.yaml
+            registry: Dataset registry for resolving contracts
+            adapter: Table format adapter for writing curated data
             resolver: Path resolver for output paths
-            fred_api_key: FRED API key (legacy mode)
-            package_dir: Path to builder package (YAML mode)
-            registry: Contract registry (YAML mode)
-            overrides: Parameter overrides (YAML mode)
+            overrides: Parameter overrides (e.g., {"rate_types": ["10year"], "start_date": "2020-01-01"})
         """
-        if package_dir is not None:
-            # YAML mode: Load builder.yaml and initialize from params
-            super().__init__(
-                package_dir=package_dir,
-                registry=registry,
-                adapter=adapter,
-                resolver=resolver,
-                overrides=overrides,
+        # Load YAML configuration
+        super().__init__(
+            package_dir=package_dir,
+            registry=registry,
+            adapter=adapter,
+            resolver=resolver,
+            overrides=overrides,
+        )
+
+        # Get FRED API key from params or environment
+        api_key = self.params.get("fred_api_key") or os.environ.get("FRED_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "FRED API key is required. "
+                "Set 'fred_api_key' parameter or FRED_API_KEY environment variable. "
+                "Get a free API key at https://fred.stlouisfed.org/docs/api/api_key.html"
             )
 
-            # Get FRED API key from params or environment
-            api_key = self.params.get("fred_api_key") or os.environ.get("FRED_API_KEY")
-            if not api_key:
-                raise ValueError(
-                    "FRED API key is required. "
-                    "Set 'fred_api_key' parameter or FRED_API_KEY environment variable. "
-                    "Get a free API key at https://fred.stlouisfed.org/docs/api/api_key.html"
-                )
-
-            self.fred_api_key = api_key
-
-        else:
-            # Legacy mode: Direct instantiation
-            super().__init__(contract, adapter, resolver)
-
-            if not fred_api_key:
-                raise ValueError(
-                    "FRED API key is required. "
-                    "Get a free API key at https://fred.stlouisfed.org/docs/api/api_key.html"
-                )
-
-            self.fred_api_key = fred_api_key
+        self.fred_api_key = api_key
 
     @retry(
         stop=stop_after_attempt(3),
@@ -128,37 +91,19 @@ class USTreasuryRateBuilder(DataBuilderBase):
         """
         Fetch raw treasury rate data from FRED API.
 
-        Supports two modes:
-        1. Batch mode: Fetch multiple rate_types in one call
-        2. Single mode: Fetch one rate_type (legacy)
+        Fetches multiple rate_types in batch mode.
 
         Args:
-            **kwargs: Keyword arguments
-                rate_types (list): List of rate types to fetch (batch mode)
-                rate_type (str): Single rate type (legacy mode)
-                start_date (str): Start date in 'YYYY-MM-DD' format
-                end_date (str): End date in 'YYYY-MM-DD' format
-                fail_on_error (bool): If True, fail on any error; if False, skip failed rates
+            **kwargs: Keyword arguments from build() (includes partitions and params)
 
         Returns:
             Raw DataFrame with columns: [date, value, rate_type]
         """
-        # Get parameters (YAML mode uses self.params, legacy uses kwargs)
-        rate_types = kwargs.get("rate_types")
-        start_date = kwargs.get("start_date")
-        end_date = kwargs.get("end_date")
-        fail_on_error = kwargs.get("fail_on_error", False)
-
-        # YAML mode: read from self.params
-        if hasattr(self, "params"):
-            rate_types = rate_types or self.params.get("rate_types", [])
-            start_date = start_date or self.params.get("start_date")
-            end_date = end_date or self.params.get("end_date")
-            fail_on_error = fail_on_error or self.params.get("fail_on_error", False)
-
-        # Legacy single rate_type support
-        if not rate_types and "rate_type" in kwargs:
-            rate_types = [kwargs["rate_type"]]
+        # Get parameters from self.params (loaded from YAML)
+        rate_types = self.params.get("rate_types", [])
+        start_date = self.params.get("start_date")
+        end_date = self.params.get("end_date")
+        fail_on_error = self.params.get("fail_on_error", False)
 
         # Default to all rate types if none specified
         if not rate_types:

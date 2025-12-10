@@ -14,9 +14,9 @@ io:
     type:
       domain: reference-rates
       asset_class: null
-      subdomain: treasury_rate
-      region: US
-      frequency: daily
+      subdomain: yield-curves
+      region: US  # Hardcoded: US-specific (FRED API)
+      frequency: null  # Partitioned (daily/weekly/monthly)
 
 # Builder parameters
 parameters:

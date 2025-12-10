@@ -112,13 +112,9 @@ class USTreasuryRateLoader(BaseLoader):
                     f"Must be one of: {valid_rate_types}"
                 )
 
-        # Map frequency to enum
-        freq_map = {
-            "daily": Frequency.DAILY,
-            "weekly": Frequency.WEEKLY,
-            "monthly": Frequency.MONTHLY,
-        }
-        freq_enum = freq_map.get(frequency.lower(), Frequency.DAILY)
+        # Convert frequency string to enum
+        freq_enum = Frequency(frequency)
+        freq_str = frequency
 
         # Load data from curated storage
         # Treasury data is partitioned by rate_type and frequency

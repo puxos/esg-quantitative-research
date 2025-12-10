@@ -1,13 +1,15 @@
 """
-Market Proxy Loader Implementation
-===================================
+Market Proxy Loader
+===================
 
-Loads market proxy OHLCV price data (e.g., SPY) for benchmarking and factor models.
+Load market proxy OHLCV price data (e.g., SPY) for benchmarking and factor models.
 
-This loader:
-1. Loads OHLCV data for the specified market proxy symbol
-2. Filters to the requested date range
-3. Returns a DataFrame with OHLCV columns (date, open, high, low, close, volume, adj_close)
+This loader is a specialized single-symbol variant of ohlcv_panel, designed for
+loading benchmark/market proxy data (like SPY) commonly used in:
+- CAPM models (market returns)
+- Beta estimation (benchmark returns)
+- Performance attribution (benchmark comparison)
+- Sharpe ratio calculations
 
 Usage in DAG:
 -------------
@@ -19,7 +21,8 @@ Task(
         overrides={
             "start_date": "2014-01-01",
             "end_date": "2024-12-31",
-            "proxy_symbol": "SPY"
+            "proxy_symbol": "SPY",
+            "frequency": "daily"
         }
     ),
     deps=["BuildOHLCV"]
@@ -27,114 +30,84 @@ Task(
 ```
 """
 
-import numpy as np
+from pathlib import Path
+
 import pandas as pd
 
-from qx.common.types import AssetClass, DatasetType, Domain, Frequency
 from qx.foundation.base_loader import BaseLoader
 
 
 class MarketProxyLoader(BaseLoader):
     """
-    Load market proxy OHLCV price data for benchmarking and factor models.
+    Load market proxy OHLCV price data for a single benchmark symbol.
 
-    This loader provides a clean interface to fetch market OHLCV price data,
-    commonly used in CAPM, Sharpe ratio calculations, beta estimation, and performance
-    attribution.
+    This is a specialized single-symbol OHLCV loader for benchmarks (SPY, VTI, etc.)
+    used in factor models and performance analysis.
 
-    Parameters
-    ----------
-    start_date : str
-        Start date for market proxy data (YYYY-MM-DD)
-    end_date : str
-        End date for market proxy data (YYYY-MM-DD)
-    proxy_symbol : str, optional
-        Market proxy ticker symbol (default: "SPY")
-    frequency : str, optional
-        Data frequency - "D", "W", or "M" (default: "D")
-    exchange : str, optional
-        Exchange for market proxy (default: "US")
+    Parameters (from loader.yaml):
+        start_date: Period start (YYYY-MM-DD)
+        end_date: Period end (YYYY-MM-DD)
+        proxy_symbol: Market proxy ticker (default: "SPY")
+        frequency: Data frequency - "daily", "weekly", "monthly" (default: "daily")
+        exchange: Exchange filter (default: "US")
 
-    Returns
-    -------
-    pd.DataFrame
-        Market proxy OHLCV price data with columns: date, symbol, open, high, low, close, volume, adj_close
-
-    Examples
-    --------
-    >>> # Basic usage
-    >>> loader = MarketProxyLoader(
-    ...     curated_loader=curated_loader,
-    ...     params={
-    ...         "start_date": "2014-01-01",
-    ...         "end_date": "2024-12-31",
-    ...         "proxy_symbol": "SPY"
-    ...     }
-    ... )
-    >>> market_returns = loader.load()
+    Returns:
+        pd.DataFrame: OHLCV data with columns:
+            - date, symbol, open, high, low, close, volume, adj_close
     """
 
     def load_impl(self) -> pd.DataFrame:
         """
-        Load market proxy OHLCV price data.
+        Load market proxy OHLCV price data (single symbol).
 
-        Returns
-        -------
-        pd.DataFrame
-            Market proxy OHLCV price data with columns: date, symbol, open, high, low, close, volume, adj_close
+        Returns:
+            DataFrame with OHLCV data for the market proxy symbol
 
-        Raises
-        ------
-        ValueError
-            If no data found for the specified market proxy symbol
+        Raises:
+            ValueError: If no data found for the market proxy symbol
         """
         # Get parameters
         start_date = pd.Timestamp(self.params["start_date"])
         end_date = pd.Timestamp(self.params["end_date"])
         proxy_symbol = self.params.get("proxy_symbol", "SPY")
-        frequency = self.params.get("frequency", "D")
+        frequency = self.params.get("frequency", "daily")
         exchange = self.params.get("exchange", "US")
 
-        # Map frequency to enum
-        freq_map = {"D": Frequency.DAILY, "W": Frequency.WEEKLY, "M": Frequency.MONTHLY}
-        freq_enum = freq_map.get(frequency, Frequency.DAILY)
+        print(f"📊 Loading market proxy OHLCV data")
+        print(f"   Symbol: {proxy_symbol}")
+        print(f"   Period: {start_date.date()} to {end_date.date()}")
+        print(f"   Frequency: {frequency}")
+        print(f"   Exchange: {exchange}")
 
-        # Load OHLCV data for market proxy
-        ohlcv_type = DatasetType(
-            domain=Domain.MARKET_DATA,
-            asset_class=AssetClass.EQUITY,
-            subdomain="ohlcv",
-            region=None,
-            frequency=freq_enum,
-        )
+        # Use frequency string directly (matches storage directory names)
+        freq_str = frequency
 
-        # Load data from curated
-        # OHLCV data is partitioned by exchange, frequency, symbol, year
-        # Build path manually and glob for all years
+        # Construct the base path for this symbol
+        # Path structure: data/curated/market-data/ohlcv/schema_v1/exchange={exchange}/frequency={freq}/symbol={symbol}/year={year}
+        base_path = f"data/curated/market-data/ohlcv/schema_v1/exchange={exchange}/frequency={freq_str}/symbol={proxy_symbol}"
+
+        # Load all year partitions for this symbol
         from pathlib import Path
 
-        base_path = Path("data/curated/market-data/ohlcv/schema_v1")
-        symbol_path = (
-            base_path
-            / f"exchange={exchange}"
-            / f"frequency={frequency}"
-            / f"symbol={proxy_symbol}"
-        )
+        full_base_path = Path(base_path)
 
-        if not symbol_path.exists():
+        if not full_base_path.exists():
             raise ValueError(
                 f"No data found for market proxy '{proxy_symbol}'. "
-                f"Make sure it was included when building OHLCV data. "
-                f"Expected path: {symbol_path}"
+                f"Make sure it was included when building OHLCV data (use market_proxy_symbols parameter). "
+                f"Expected path: {full_base_path}"
             )
 
-        # Load all year partitions
-        year_dirs = list(symbol_path.glob("year=*"))
+        # Find all year directories
+        year_dirs = list(full_base_path.glob("year=*"))
         if not year_dirs:
             raise ValueError(
-                f"No year partitions found for {proxy_symbol} at {symbol_path}"
+                f"No year partitions found for '{proxy_symbol}' at {full_base_path}"
             )
 
+        print(f"✅ Found {len(year_dirs)} year partitions")
+
+        # Load all parquet files from all years
         dfs = []
         for year_dir in sorted(year_dirs):
             parquet_files = list(year_dir.glob("*.parquet"))
@@ -143,52 +116,40 @@ class MarketProxyLoader(BaseLoader):
                 dfs.append(df_year)
 
         if not dfs:
-            raise ValueError(f"No parquet files found for {proxy_symbol}")
+            raise ValueError(f"No parquet files found for '{proxy_symbol}'")
 
-        all_data = pd.concat(dfs, ignore_index=True)
+        # Concatenate all data
+        df = pd.concat(dfs, ignore_index=True)
+        print(f"✅ Loaded {len(df):,} raw records for {proxy_symbol}")
 
         # Ensure date column is datetime
-        all_data["date"] = pd.to_datetime(all_data["date"])
+        if "date" not in df.columns:
+            raise ValueError("No 'date' column found in OHLCV data")
+
+        df["date"] = pd.to_datetime(df["date"])
 
         # Filter by date range
-        proxy_df = all_data[
-            (all_data["date"] >= pd.Timestamp(start_date))
-            & (all_data["date"] <= pd.Timestamp(end_date))
-        ]
+        df = df[(df["date"] >= start_date) & (df["date"] <= end_date)].copy()
 
-        if proxy_df.empty:
+        print(f"✅ After date filter: {len(df):,} records")
+
+        if df.empty:
             raise ValueError(
                 f"No data found for market proxy '{proxy_symbol}' "
                 f"in date range {start_date.date()} to {end_date.date()}"
             )
 
-        # Sort by date
-        proxy_df = proxy_df.sort_values("date").reset_index(drop=True)
+        # Sort by date for consistency
+        df = df.sort_values("date").reset_index(drop=True)
 
-        # Select relevant columns for OHLCV output
-        ohlcv_columns = [
-            "date",
-            "symbol",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "adj_close",
-        ]
+        # Report final statistics
+        date_range = df["date"].agg(["min", "max"])
+        print(f"✅ Final dataset: {len(df):,} records")
+        print(
+            f"   Date range: {date_range['min'].date()} to {date_range['max'].date()}"
+        )
 
-        # Ensure all columns exist (use available columns)
-        available_columns = [col for col in ohlcv_columns if col in proxy_df.columns]
-        result_df = proxy_df[available_columns].copy()
-
-        # Validate we have data
-        if result_df.empty:
-            raise ValueError(
-                f"No price data available for market proxy '{proxy_symbol}'. "
-                f"Check that OHLCV data exists for the requested period."
-            )
-
-        return result_df
+        return df
 
 
 # Example usage
@@ -198,44 +159,51 @@ if __name__ == "__main__":
     """
     from qx.common.contracts import DatasetRegistry
     from qx.common.predefined import seed_registry
-    from qx.foundation.typed_loader import TypedCuratedLoader
+    from qx.orchestration.factories import run_loader
     from qx.storage.backend_local import LocalParquetBackend
     from qx.storage.pathing import PathResolver
+    from qx.storage.table_format import TableFormatAdapter
 
     # Initialize storage components
     registry = DatasetRegistry()
     seed_registry(registry)
     backend = LocalParquetBackend(base_uri="file://.")
     resolver = PathResolver()
+    adapter = TableFormatAdapter(backend)
 
-    # Create curated loader
-    curated_loader = TypedCuratedLoader(
-        backend=backend, resolver=resolver, registry=registry
-    )
+    print("=" * 80)
+    print("Market Proxy Loader - Example Usage")
+    print("=" * 80)
 
-    # Load market proxy returns
-    loader = MarketProxyLoader(
-        curated_loader=curated_loader,
-        params={
-            "start_date": "2014-01-01",
+    # Load market proxy OHLCV data
+    task_fn = run_loader(
+        package_path="qx_loaders/market_proxy",
+        registry=registry,
+        backend=backend,
+        resolver=resolver,
+        overrides={
+            "start_date": "2020-01-01",
             "end_date": "2024-12-31",
             "proxy_symbol": "SPY",
-            "frequency": "D",
-            "return_type": "simple",
+            "frequency": "daily",
+            "exchange": "US",
         },
     )
 
-    print("Loading market proxy returns...")
-    market_returns = loader.load()
+    print("\nLoading market proxy OHLCV data...")
+    result = task_fn()
+    market_df = result["output"]
 
-    print(f"\nMarket Proxy Returns Summary:")
+    print(f"\nMarket Proxy OHLCV Summary:")
     print(f"  Symbol: SPY")
-    print(f"  Period: {market_returns.index[0]} to {market_returns.index[-1]}")
-    print(f"  Observations: {len(market_returns)}")
-    print(f"  Mean return: {market_returns.mean():.4%}")
-    print(f"  Std dev: {market_returns.std():.4%}")
+    print(f"  Records: {len(market_df):,}")
     print(
-        f"  Sharpe (annualized): {(market_returns.mean() / market_returns.std()) * np.sqrt(252):.2f}"
+        f"  Date range: {market_df['date'].min().date()} to {market_df['date'].max().date()}"
     )
-    print(f"\nFirst 5 returns:")
-    print(market_returns.head())
+    print(f"  Columns: {list(market_df.columns)}")
+
+    print(f"\nFirst 5 records:")
+    print(market_df.head())
+
+    print(f"\nLast 5 records:")
+    print(market_df.tail())

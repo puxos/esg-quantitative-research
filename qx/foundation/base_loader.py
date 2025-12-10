@@ -95,9 +95,9 @@ class BaseLoader:
         self.package_dir = Path(package_dir)
         self.registry = registry
         self.backend = backend
-        self.resolver = resolver
 
-        # Load loader.yaml
+        # Apply mode override if specified in loader.yaml
+        # This allows packages to force a specific mode (e.g., reference data always uses prod)
         yaml_path = self.package_dir / "loader.yaml"
         if not yaml_path.exists():
             raise FileNotFoundError(f"loader.yaml not found in {package_dir}")
@@ -105,8 +105,22 @@ class BaseLoader:
         with open(yaml_path, "r") as f:
             self.config = yaml.safe_load(f)
 
-        # Extract loader info
         self.info = self.config.get("loader", {})
+        package_mode = self.info.get("mode")
+        if (
+            package_mode
+            and resolver is not None
+            and hasattr(resolver, "mode")
+            and resolver.mode != package_mode
+        ):
+            # Create new resolver with overridden mode
+            from qx.storage.pathing import PathResolver
+
+            self.resolver = PathResolver(mode=package_mode)
+        else:
+            self.resolver = resolver
+
+        # Load loader.yaml configuration
         self.loader_id = self.info.get("id", "unknown")
         self.version = self.info.get("version", "unknown")
         self.description = self.info.get("description", "")

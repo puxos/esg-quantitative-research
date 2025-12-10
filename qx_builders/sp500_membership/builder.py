@@ -23,51 +23,42 @@ class SP500MembershipBuilder(DataBuilderBase):
 
     Transforms raw CSV (date, tickers) into curated daily membership data.
 
-    Supports both legacy and YAML-based initialization:
-    - Legacy: contract, adapter, resolver, raw_data_root, membership_filename
-    - YAML: package_dir, registry, adapter, resolver, overrides
+    YAML-based initialization only - uses builder.yaml configuration.
     """
 
     def __init__(
         self,
-        contract: Optional[DatasetContract] = None,
-        adapter: Optional[TableFormatAdapter] = None,
-        resolver: Optional[PathResolver] = None,
-        raw_data_root: Optional[str] = None,
-        membership_filename: Optional[str] = None,
-        package_dir: Optional[str] = None,
-        registry: Optional[DatasetRegistry] = None,
+        package_dir: str,
+        registry: DatasetRegistry,
+        adapter: TableFormatAdapter,
+        resolver: PathResolver,
         overrides: Optional[dict] = None,
     ):
         """
-        Initialize S&P 500 membership builder.
+        Initialize S&P 500 membership builder from YAML configuration.
 
-        Supports both legacy and YAML-based modes.
+        Args:
+            package_dir: Path to builder package containing builder.yaml
+            registry: Dataset registry for resolving contracts
+            adapter: Table format adapter for writing curated data
+            resolver: Path resolver for output paths
+            overrides: Parameter overrides
         """
-        # Call parent __init__ to handle YAML loading if package_dir provided
+        # Load YAML configuration
         super().__init__(
-            contract=contract,
-            adapter=adapter,
-            resolver=resolver,
             package_dir=package_dir,
             registry=registry,
+            adapter=adapter,
+            resolver=resolver,
             overrides=overrides,
         )
 
-        # Legacy mode: use provided parameters
-        if package_dir is None:
-            self.raw_data_root = Path(raw_data_root or "./data/raw")
-            self.membership_filename = (
-                membership_filename
-                or "S&P 500 Historical Components & Changes(11-16-2025).csv"
-            )
-        # YAML mode: parameters already loaded by parent into self.params
-        else:
-            self.raw_data_root = Path(self.params.get("raw_data_root", "./data/raw"))
-            self.membership_filename = self.params.get(
-                "membership_filename",
-                "S&P 500 Historical Components & Changes(11-16-2025).csv",
-            )
+        # Get parameters from YAML config (loaded by parent)
+        self.raw_data_root = Path(self.params.get("raw_data_root", "./data/raw"))
+        self.membership_filename = self.params.get(
+            "membership_filename",
+            "S&P 500 Historical Components & Changes(11-16-2025).csv",
+        )
 
     def fetch_raw(self, **kwargs) -> pd.DataFrame:
         """

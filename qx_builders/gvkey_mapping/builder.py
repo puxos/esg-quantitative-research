@@ -67,43 +67,38 @@ class GVKEYMappingBuilder(DataBuilderBase):
     - ESG data (GVKEY → ticker)
     - Historical backfilling (resolve old tickers)
     - Cross-dataset linkage
+
+    YAML-based initialization only - uses builder.yaml configuration.
     """
 
     def __init__(
         self,
-        contract: Optional[DatasetContract] = None,
-        adapter: Optional[TableFormatAdapter] = None,
-        resolver: Optional[PathResolver] = None,
-        raw_file_path: Optional[str] = None,
-        package_dir: Optional[str] = None,
-        registry: Optional["DatasetRegistry"] = None,
+        package_dir: str,
+        registry: "DatasetRegistry",
+        adapter: TableFormatAdapter,
+        resolver: PathResolver,
         overrides: Optional[dict] = None,
     ):
         """
-        Initialize GVKEY mapping builder.
-
-        Supports both legacy and YAML-based modes.
+        Initialize GVKEY mapping builder from YAML configuration.
 
         Args:
-            contract: Dataset contract for gvkey_mapping (legacy mode)
-            adapter: Storage adapter (legacy mode)
-            resolver: Path resolver (legacy mode)
-            raw_file_path: Path to raw mapping Excel file
-            package_dir: Path to builder package (YAML mode)
-            registry: Dataset registry (YAML mode)
-            overrides: Parameter overrides (YAML mode)
+            package_dir: Path to builder package containing builder.yaml
+            registry: Dataset registry for resolving contracts
+            adapter: Table format adapter for writing curated data
+            resolver: Path resolver for output paths
+            overrides: Parameter overrides
         """
-        # Call parent __init__ to handle YAML loading if package_dir provided
+        # Load YAML configuration
         super().__init__(
-            contract=contract,
-            adapter=adapter,
-            resolver=resolver,
             package_dir=package_dir,
             registry=registry,
+            adapter=adapter,
+            resolver=resolver,
             overrides=overrides,
         )
 
-        # Set raw file path (from params - already resolved by base class)
+        # Get raw file path from params (already resolved by base class)
         self.raw_file_path = self.params.get("crsp_file", "./raw/data_mapping.xlsx")
 
     def fetch_raw(self, **kwargs) -> pd.DataFrame:

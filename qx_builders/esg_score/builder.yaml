@@ -23,8 +23,8 @@ io:
 parameters:
   esg_source_path:
     type: string
-    default: "./raw/data_matlab_ESG_withSIC.xlsx"
-    description: "Path to ESG data file (Excel or CSV, relative to package)"
+    default: "raw/data_matlab_ESG_withSIC.xlsx"
+    description: "Path to ESG data file (Excel or CSV, relative to package directory)"
 
   start_year:
     type: int

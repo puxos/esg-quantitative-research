@@ -4,9 +4,9 @@
 dataset:
   domain: reference-rates
   asset_class: null
-  subdomain: treasury_rate
-  region: US
-  frequency: daily  # Daily data (can be resampled)
+  subdomain: yield-curves  # US Treasury rates form a yield curve
+  region: US  # Hardcoded: this builder is US-specific (FRED API)
+  frequency: null  # Frequency is partitioned (daily/weekly/monthly)
 
 contract:
   schema_version: schema_v1
@@ -52,7 +52,6 @@ contract:
       filterable: false
 
   partition_keys:
-    - region
     - rate_type
     - frequency
 

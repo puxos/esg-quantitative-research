@@ -12,7 +12,15 @@ from typing import Any, Dict, List, Optional, Tuple
 import yaml
 
 from qx.common.contracts import DatasetContract
-from qx.common.types import AssetClass, DatasetType, Domain, Exchange, Frequency, Region
+from qx.common.types import (
+    AssetClass,
+    DatasetType,
+    Domain,
+    Exchange,
+    Frequency,
+    Region,
+    Subdomain,
+)
 
 
 @dataclass
@@ -139,6 +147,11 @@ class SchemaLoader:
         None: None,
     }
 
+    # Build SUBDOMAIN_MAP dynamically from Subdomain enum
+    SUBDOMAIN_MAP = {member.value: member for member in Subdomain}
+    SUBDOMAIN_MAP["null"] = None
+    SUBDOMAIN_MAP[None] = None
+
     def __init__(self):
         pass
 
@@ -188,7 +201,7 @@ class SchemaLoader:
         dataset_section = schema["dataset"]
         domain = self._parse_domain(dataset_section.get("domain"))
         asset_class = self._parse_asset_class(dataset_section.get("asset_class"))
-        subdomain = dataset_section.get("subdomain")
+        subdomain = self._parse_subdomain(dataset_section.get("subdomain"))
 
         # Handle parameterized region/frequency (for contract-level identity)
         region = self._parse_region(dataset_section.get("region"), params.get("region"))
@@ -309,6 +322,17 @@ class SchemaLoader:
         if value in self.ASSET_CLASS_MAP:
             return self.ASSET_CLASS_MAP[value]
         return None
+
+    def _parse_subdomain(self, value: Optional[str]) -> Optional[Subdomain]:
+        """Parse subdomain from string."""
+        if value is None:
+            raise ValueError("Subdomain is required")
+        if value not in self.SUBDOMAIN_MAP:
+            raise ValueError(
+                f"Invalid subdomain: '{value}'. "
+                f"Valid values: {list(self.SUBDOMAIN_MAP.keys())}"
+            )
+        return self.SUBDOMAIN_MAP[value]
 
     def _parse_region(
         self, schema_value: Optional[str], param_value: Optional[Any]

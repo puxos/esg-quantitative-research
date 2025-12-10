@@ -137,7 +137,7 @@ class DatasetType:
 
     domain: Domain
     asset_class: Optional[AssetClass]
-    subdomain: str
+    subdomain: Optional[Subdomain]
     region: Optional[Region]  # Contract-level: US, HK, GLOBAL
     frequency: Optional[Frequency]
     dims: Tuple[Tuple[str, str], ...] = field(default_factory=tuple)

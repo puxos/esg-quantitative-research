@@ -4,3 +4,26 @@ storage:
   table_format: parquet
   write_mode: append
   small_file_compaction_mb: 128
+
+  # Environment mode: dev or prod
+  # - dev: Isolated test environment with smaller datasets (data/dev/*)
+  # - prod: Production research data (data/curated, data/processed)
+  mode: dev
+
+# Path configurations for different modes
+paths:
+  dev:
+    curated: "data/dev/curated"
+    processed: "data/dev/processed"
+    raw: "data/dev/raw"  # Optional: smaller test raw data (or use package-local)
+
+  prod:
+    curated: "data/curated"
+    processed: "data/processed"
+    raw: "qx_builders/{builder}/raw"  # Package-local raw data (current structure)
+
+# Mode behavior notes:
+# - Dev mode is for testing, experimentation, and smaller datasets
+# - Prod mode is for full research datasets and publication-ready outputs
+# - Packages can override mode in their yaml files (e.g., reference data always uses prod)
+# - Switch modes via: storage.mode config, QX_MODE env var, or runtime override

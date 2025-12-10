@@ -1,26 +1,21 @@
 """
-Tiingo Price Data Builder
+Tiingo Price Data Builder (YAML-Only Version)
 
 Fetches OHLCV price data from Tiingo API and builds curated datasets.
-Migrated from src/market/price_manager.py to Qx architecture.
 
-Supports both legacy and YAML-based initialization for DAG orchestration.
+This is a simplified version that ONLY supports YAML-based initialization.
+Legacy support has been removed for cleaner code.
 """
 
 import os
-from datetime import datetime
-from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import pandas as pd
 from tenacity import retry, stop_after_attempt, wait_exponential
 from tiingo import TiingoClient
 
-from qx.common.contracts import DatasetContract, DatasetRegistry
 from qx.common.ticker_mapper import TickerMapper
 from qx.foundation.base_builder import DataBuilderBase
-from qx.storage.pathing import PathResolver
-from qx.storage.table_format import TableFormatAdapter
 from qx.utils.date_utils import (
     adjust_fetch_dates,
     check_date_coverage,
@@ -35,66 +30,54 @@ class TiingoOHLCVBuilder(DataBuilderBase):
     Fetches OHLCV data including adjusted prices, dividends, and splits.
     Transforms to curated format with proper partitioning.
 
-    Supports both legacy and YAML-based initialization:
-    - Legacy: contract, adapter, resolver, tiingo_client, exchange, currency
-    - YAML: package_dir, registry, adapter, resolver, overrides
+    YAML-only initialization - reads all config from builder.yaml.
+    Use with run_builder() factory in DAG orchestration.
     """
 
     def __init__(
         self,
-        contract: Optional[DatasetContract] = None,
-        adapter: Optional[TableFormatAdapter] = None,
-        resolver: Optional[PathResolver] = None,
-        tiingo_client: Optional[TiingoClient] = None,
-        exchange: Optional[str] = None,
-        currency: Optional[str] = None,
-        ticker_mapper: Optional[TickerMapper] = None,
-        package_dir: Optional[str] = None,
-        registry: Optional[DatasetRegistry] = None,
+        package_dir: str,
+        registry,
+        adapter,
+        resolver,
         overrides: Optional[dict] = None,
     ):
         """
-        Initialize Tiingo price builder.
+        Initialize Tiingo price builder from YAML configuration.
 
-        Supports both legacy and YAML-based modes.
+        Args:
+            package_dir: Path to builder package (e.g., "qx_builders/tiingo_ohlcv")
+            registry: Dataset registry for resolving contracts
+            adapter: Table format adapter for writing data
+            resolver: Path resolver for output paths
+            overrides: Parameter overrides (e.g., {"symbols": ["AAPL"], "start_date": "2020-01-01"})
         """
-        # Call parent __init__ to handle YAML loading if package_dir provided
+        # Call parent to load builder.yaml and initialize parameters
         super().__init__(
-            contract=contract,
-            adapter=adapter,
-            resolver=resolver,
             package_dir=package_dir,
             registry=registry,
+            adapter=adapter,
+            resolver=resolver,
             overrides=overrides,
         )
 
-        # Legacy mode: use provided parameters
-        if package_dir is None:
-            self.tiingo = tiingo_client
-            self.exchange = exchange or "US"
-            self.currency = currency or "USD"
-            self.ticker_mapper = ticker_mapper or TickerMapper()
-        # YAML mode: initialize from parameters
-        else:
-            # Get API key from params or environment
-            api_key = self.params.get("tiingo_api_key") or os.environ.get(
-                "TIINGO_API_KEY"
+        # Get API key from params or environment
+        api_key = self.params.get("tiingo_api_key") or os.environ.get("TIINGO_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "Tiingo API key required. Set 'tiingo_api_key' parameter or TIINGO_API_KEY env var"
             )
-            if not api_key:
-                raise ValueError(
-                    "Tiingo API key required. Set 'tiingo_api_key' parameter or TIINGO_API_KEY env var"
-                )
 
-            # Initialize Tiingo client
-            self.tiingo = TiingoClient({"api_key": api_key})
+        # Initialize Tiingo client
+        self.tiingo = TiingoClient({"api_key": api_key})
 
-            # Initialize other attributes from params
-            self.exchange = self.params.get("exchange", "US")
-            self.currency = self.params.get("currency", "USD")
+        # Initialize attributes from params
+        self.exchange = self.params.get("exchange", "US")
+        self.currency = self.params.get("currency", "USD")
 
-            # Ticker mapper (for handling corporate actions like FB→META)
-            use_ticker_mapper = self.params.get("use_ticker_mapper", True)
-            self.ticker_mapper = TickerMapper() if use_ticker_mapper else None
+        # Ticker mapper (for handling corporate actions like FB→META)
+        use_ticker_mapper = self.params.get("use_ticker_mapper", True)
+        self.ticker_mapper = TickerMapper() if use_ticker_mapper else None
 
     @retry(
         stop=stop_after_attempt(3),
@@ -105,8 +88,7 @@ class TiingoOHLCVBuilder(DataBuilderBase):
         """
         Fetch raw price data from Tiingo API for multiple symbols.
 
-        In YAML mode, reads symbols, start_date, end_date, frequency from kwargs.
-        In legacy mode, expects individual symbol fetch.
+        Reads parameters from kwargs (populated by base class from builder.yaml).
 
         Returns:
             Combined DataFrame with data for all symbols
@@ -116,19 +98,22 @@ class TiingoOHLCVBuilder(DataBuilderBase):
         start_date = kwargs.get("start_date")
         end_date = kwargs.get("end_date")
         frequency = kwargs.get("frequency", "daily")
-        partitions = kwargs.get("partitions", {})
         fail_on_error = kwargs.get("fail_on_error", False)
         apply_date_correction = kwargs.get("apply_date_correction", True)
-        tolerance_days_param = kwargs.get(
-            "tolerance_days"
-        )  # Can be None, string, or int
+
         # Convert tolerance_days to int if provided
+        tolerance_days_param = kwargs.get("tolerance_days")
         tolerance_days = None
         if tolerance_days_param is not None and tolerance_days_param != "null":
             tolerance_days = (
                 int(tolerance_days_param)
                 if isinstance(tolerance_days_param, str)
                 else tolerance_days_param
+            )
+
+        if not symbols:
+            raise ValueError(
+                "No symbols provided. Set 'symbols' parameter with list of tickers"
             )
 
         # Apply date correction to fetch dates if enabled
@@ -144,21 +129,6 @@ class TiingoOHLCVBuilder(DataBuilderBase):
                 print(f"   Fetching:  {start_date} to {end_date}")
                 tolerance = tolerance_days or get_tolerance_for_frequency(frequency)
                 print(f"   Tolerance: ±{tolerance} days ({frequency})")
-
-        # Legacy mode: single symbol fetch
-        if "symbol" in kwargs:
-            return self._fetch_single_symbol(
-                symbol=kwargs["symbol"],
-                start_date=start_date,
-                end_date=end_date,
-                frequency=frequency,
-            )
-
-        # YAML mode: batch fetch multiple symbols
-        if not symbols:
-            raise ValueError(
-                "No symbols provided. Set 'symbols' parameter with list of tickers"
-            )
 
         # Add market proxy symbols (SPY by default) to the batch
         market_proxy_symbols = kwargs.get("market_proxy_symbols", ["SPY"])
@@ -289,15 +259,10 @@ class TiingoOHLCVBuilder(DataBuilderBase):
                     apply_tolerance=True,
                 )
 
-                # Report completeness
-                if coverage["is_complete"]:
-                    status = "✅ COMPLETE"
-                    if coverage["start_gap_days"] > 0 or coverage["end_gap_days"] > 0:
-                        status += f" (±{coverage['tolerance_days']}d)"
-                else:
-                    status = f"⚠️  PARTIAL (missing: {coverage['start_gap_days']}d start, {coverage['end_gap_days']}d end)"
-
-                # Don't print for every symbol, just summary in fetch_raw
+                # Report completeness (summary only, not per-symbol details)
+                if not coverage["is_complete"]:
+                    gap_info = f"missing: {coverage['start_gap_days']}d start, {coverage['end_gap_days']}d end"
+                    # Could log this for monitoring, but don't print for every symbol
 
             return df
 
@@ -310,11 +275,9 @@ class TiingoOHLCVBuilder(DataBuilderBase):
         """
         Transform raw Tiingo data to curated OHLCV format.
 
-        Handles both single symbol (legacy) and multi-symbol (YAML) modes.
-
         Args:
             raw_df: Raw DataFrame from Tiingo API
-            **kwargs: May contain symbol, frequency, partitions
+            **kwargs: May contain frequency, partitions
 
         Returns:
             Curated DataFrame with canonical schema including:
@@ -329,12 +292,6 @@ class TiingoOHLCVBuilder(DataBuilderBase):
 
         # Extract parameters
         frequency = kwargs.get("frequency", "daily")
-        partitions = kwargs.get("partitions", {})
-
-        # Map frequency codes (D → daily, W → weekly, M → monthly)
-        frequency_map = {"D": "daily", "W": "weekly", "M": "monthly"}
-        if frequency in frequency_map:
-            frequency = frequency_map[frequency]
 
         # Convert date to date type (not datetime)
         raw_df["date"] = pd.to_datetime(raw_df["date"]).dt.date
@@ -344,11 +301,7 @@ class TiingoOHLCVBuilder(DataBuilderBase):
             {
                 "date": raw_df["date"],
                 "exchange": self.exchange,
-                "symbol": (
-                    raw_df["symbol"]
-                    if "symbol" in raw_df.columns
-                    else kwargs.get("symbol")
-                ),
+                "symbol": raw_df["symbol"],  # Always present in YAML mode
                 "currency": self.currency,
                 "frequency": frequency,
                 "open": raw_df["open"].astype(float),
@@ -376,98 +329,3 @@ class TiingoOHLCVBuilder(DataBuilderBase):
         print(f"   Years: {sorted(curated['year'].unique())}")
 
         return curated
-
-    def build_for_symbol(
-        self,
-        symbol: str,
-        exchange: str,
-        frequency: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-    ) -> list[str]:
-        """
-        DEPRECATED: Use DAG orchestration with run_builder() instead.
-
-        Legacy method for building price data for a single symbol.
-
-        For new code, use:
-            task = Task(
-                id="BuildOHLCV",
-                run=run_builder(
-                    "qx_builders/tiingo_ohlcv",
-                    partitions={"exchange": "US", "frequency": "D"},
-                    overrides={"symbols": ["AAPL"], "start_date": "2020-01-01"}
-                ),
-                deps=[]
-            )
-
-        Args:
-            symbol: Ticker symbol
-            exchange: Exchange code (e.g., "US", "NYSE", "NASDAQ")
-            frequency: Data frequency ("daily", "weekly", "monthly")
-            start_date: Start date (YYYY-MM-DD)
-            end_date: End date (YYYY-MM-DD)
-
-        Returns:
-            List of output paths (one per year partition)
-        """
-        import warnings
-
-        warnings.warn(
-            "build_for_symbol() is deprecated. Use DAG orchestration with run_builder() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        # Resolve ticker symbol first (handle corporate actions)
-        actual_symbol = self.ticker_mapper.resolve(symbol)
-
-        if actual_symbol is None:
-            print(f"⚠️  Skipping {symbol}: delisted/acquired with no successor")
-            return []
-
-        if actual_symbol != symbol:
-            print(f"📝 Resolved ticker: {symbol} → {actual_symbol}")
-
-        # Fetch and transform using resolved symbol
-        raw_df = self.fetch_raw(
-            symbol=actual_symbol,
-            start_date=start_date,
-            end_date=end_date,
-            frequency=frequency,
-        )
-
-        if raw_df.empty:
-            print(f"⚠️  No data to build for {symbol} (resolved: {actual_symbol})")
-            return []
-
-        # Transform using the ORIGINAL symbol to maintain consistency
-        # (Tiingo stores historical data under the new ticker)
-        curated = self.transform_to_curated(
-            raw_df, symbol=actual_symbol, frequency=frequency
-        )
-
-        # Add schema metadata
-        curated = curated.copy()
-        curated["schema_version"] = self.contract.schema_version
-        curated["ingest_ts"] = pd.Timestamp.utcnow()
-
-        # Group by year and write separate partitions
-        output_paths = []
-
-        for year, year_df in curated.groupby("year"):
-            partitions = {
-                "exchange": exchange,
-                "frequency": frequency,
-                "symbol": symbol,
-                "year": str(year),
-            }
-
-            rel_dir = self.resolver.curated_dir(self.contract, partitions)
-            filename = f"part-{datetime.utcnow().strftime('%Y%m%dT%H%M%S')}.parquet"
-
-            output_path = self.adapter.write_batch(year_df, rel_dir, filename)
-            output_paths.append(output_path)
-            print(f"💾 Saved: {output_path} ({len(year_df)} rows)")
-
-        return output_paths

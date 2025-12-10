@@ -28,7 +28,7 @@ Example usage:
                 "start_date": "2014-01-01",
                 "end_date": "2024-12-31",
                 "symbols": ["AAPL", "MSFT", "GOOGL"],
-                "frequency": "D",
+                "frequency": "daily",
                 "exchange": "US",
                 "require_volume": False
             }
@@ -55,7 +55,7 @@ from typing import List
 
 import pandas as pd
 
-from qx.common.types import AssetClass, DatasetType, Domain, Frequency
+from qx.common.types import AssetClass, DatasetType, Domain, Frequency, Subdomain
 from qx.foundation.base_loader import BaseLoader
 
 
@@ -70,7 +70,7 @@ class OHLCVPanelLoader(BaseLoader):
         start_date: Period start (YYYY-MM-DD)
         end_date: Period end (YYYY-MM-DD)
         symbols: List of ticker symbols (can be from upstream loader)
-        frequency: Data frequency - "D" (daily), "W" (weekly), "M" (monthly)
+        frequency: Data frequency - "daily", "weekly", "monthly" (default: "daily")
         exchange: Exchange filter (default: "US")
         require_volume: Filter out zero/null volume rows (default: False)
 
@@ -90,7 +90,7 @@ class OHLCVPanelLoader(BaseLoader):
         start_date = pd.Timestamp(self.params["start_date"])
         end_date = pd.Timestamp(self.params["end_date"])
         symbols = self.params["symbols"]
-        frequency = self.params.get("frequency", "D")
+        frequency = self.params.get("frequency", "daily")
         exchange = self.params.get("exchange", "US")
         require_volume = self.params.get("require_volume", False)
 
@@ -106,19 +106,15 @@ class OHLCVPanelLoader(BaseLoader):
             print("⚠️  Empty symbol list, returning empty DataFrame")
             return pd.DataFrame()
 
-        # Map frequency parameter to Frequency enum
-        freq_map = {
-            "D": Frequency.DAILY,
-            "W": Frequency.WEEKLY,
-            "M": Frequency.MONTHLY,
-        }
-        freq_enum = freq_map.get(frequency, Frequency.DAILY)
+        # Convert frequency string to enum
+        # Frequency enum values ("daily", "weekly", "monthly") match storage paths
+        freq_enum = Frequency(frequency)
 
         # Load OHLCV data from curated data
         ohlcv_type = DatasetType(
             domain=Domain.MARKET_DATA,
             asset_class=AssetClass.EQUITY,
-            subdomain="ohlcv",
+            subdomain=Subdomain.OHLCV,
             region=None,
             frequency=freq_enum,
         )

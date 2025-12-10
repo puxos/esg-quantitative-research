@@ -13,7 +13,7 @@ io:
         asset_class: equity
         subdomain: ohlcv
         region: US
-        frequency: D
+        frequency: daily
     - name: risk_free
       required: true
       type:
@@ -21,7 +21,7 @@ io:
         asset_class: null
         subdomain: zero_rate
         region: US
-        frequency: D
+        frequency: daily
   output:
     type:
       domain: derived-metrics

@@ -71,7 +71,7 @@ io:
         asset_class: equity
         subdomain: ohlcv
         region: US
-        frequency: D
+        frequency: daily
       description: |
         Historical equity prices for covariance estimation.
         Resampled to monthly frequency and used to build Σ matrix.
@@ -86,7 +86,7 @@ io:
         asset_class: null
         subdomain: zero_rate
         region: US
-        frequency: D
+        frequency: daily
       description: |
         Risk-free rate for calculating excess returns.
         Used in covariance estimation (excess return covariance).

@@ -4,11 +4,6 @@ builder:
   description: "S&P 500 historical membership builder - transforms raw CSV into curated daily membership data"
 
 io:
-  inputs:
-    - name: raw_csv
-      type: file
-      description: "Raw S&P 500 historical components CSV file"
-
   output:
     type:
       domain: membership

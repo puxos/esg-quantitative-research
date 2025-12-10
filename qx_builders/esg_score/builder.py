@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from qx.common.ticker_mapper import TickerMapper
-from qx.common.types import AssetClass, DatasetType, Domain, Frequency
+from qx.common.types import AssetClass, DatasetType, Domain, Frequency, Subdomain
 from qx.foundation.base_builder import DataBuilderBase
 from qx_builders.gvkey_mapping import load_gvkey_mapping_from_curated
 
@@ -63,7 +63,7 @@ class ESGScoreBuilder(DataBuilderBase):
 
         # Get parameters from YAML config
         self.esg_source_path = self.params.get(
-            "esg_source_path", "data/raw/esg/data_matlab_ESG_withSIC.xlsx"
+            "esg_source_path", "raw/data_matlab_ESG_withSIC.xlsx"
         )
 
         # Create ticker mapper if enabled
@@ -80,10 +80,14 @@ class ESGScoreBuilder(DataBuilderBase):
         source_path = kwargs.get("esg_source_path", self.esg_source_path)
         raw_path = Path(source_path)
 
+        # If path is relative, resolve it relative to package directory
+        if not raw_path.is_absolute():
+            raw_path = self.package_dir / raw_path
+
         if not raw_path.exists():
             raise FileNotFoundError(
                 f"ESG data file not found: {raw_path}\n"
-                f"Please ensure data_matlab_ESG_withSIC.xlsx is in data/raw/esg/"
+                f"Please ensure data file is in the builder package's raw/ directory"
             )
 
         print(f"📂 Loading ESG data from {raw_path}")
@@ -298,7 +302,7 @@ class ESGScoreBuilder(DataBuilderBase):
             actual_dt = DatasetType(
                 domain=Domain.ESG,
                 asset_class=AssetClass.EQUITY,
-                subdomain="esg_scores",
+                subdomain=Subdomain.ESG_SCORES_LEGACY,  # Use enum, not string
                 region=None,
                 frequency=Frequency.YEARLY,
             )
