@@ -7,7 +7,7 @@ Migrated from src/universe/sp500_universe.py to Qx architecture.
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 import pandas as pd
 
@@ -59,6 +59,30 @@ class SP500MembershipBuilder(DataBuilderBase):
             "membership_filename",
             "S&P 500 Historical Components & Changes(11-16-2025).csv",
         )
+
+    def build(self, partitions: Dict = None, **kwargs):
+        """
+        Override build() to select correct contract based on mode partition.
+
+        The builder outputs either daily or intervals format depending on mode partition.
+        Must select the correct contract BEFORE calling parent's build().
+        """
+        # Determine mode from partitions
+        partitions = partitions or {}
+        mode = partitions.get("mode", "daily")
+
+        # Select appropriate contract based on mode
+        if mode == "intervals":
+            from qx_builders.sp500_membership.schema import get_sp500_intervals_contract
+
+            self.contract = get_sp500_intervals_contract()
+        else:  # daily mode
+            from qx_builders.sp500_membership.schema import get_sp500_daily_contract
+
+            self.contract = get_sp500_daily_contract()
+
+        # Now call parent's build() which will use our selected contract
+        return super().build(partitions=partitions, **kwargs)
 
     def fetch_raw(self, **kwargs) -> pd.DataFrame:
         """

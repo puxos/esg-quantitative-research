@@ -48,9 +48,15 @@ parameters:
   fred_api_key:
     type: string
     required: false
-    default: null  # Will use FRED_API_KEY environment variable
+    default: null
     description: FRED API key (or set FRED_API_KEY env var)
     example: "abc123def456..."
+
+  write_mode:
+    type: enum
+    default: "overwrite"
+    allowed: ["append", "overwrite"]
+    description: "Write mode - overwrite deletes existing files, append keeps them"
 
   # Data frequency
   frequency:

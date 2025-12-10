@@ -4,7 +4,7 @@
 dataset:
   domain: esg
   asset_class: equity
-  subdomain: esg_scores  # Uses legacy value (maps to ESG_SCORES)
+  subdomain: esg-scores  # Proper subdomain format (Subdomain.ESG_SCORES)
   region: null  # Parameterized
   frequency: yearly  # Annual ESG publication
 

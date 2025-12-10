@@ -120,6 +120,15 @@ class MarketProxyLoader(BaseLoader):
 
         # Concatenate all data
         df = pd.concat(dfs, ignore_index=True)
+
+        # Deduplicate in case multiple builder runs created duplicate files
+        if not df.empty:
+            if "ingest_ts" in df.columns:
+                df = df.sort_values("ingest_ts", ascending=False)
+            df = df.drop_duplicates(
+                subset=["date", "symbol", "exchange", "frequency"], keep="first"
+            )
+
         print(f"✅ Loaded {len(df):,} raw records for {proxy_symbol}")
 
         # Ensure date column is datetime

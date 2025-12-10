@@ -116,9 +116,16 @@ class PathResolver:
             Full path with mode prefix (e.g., 'data/dev/curated/...' or 'data/curated/...')
         """
         # Get the base path from contract (e.g., 'data/curated/market-data/ohlcv/...')
-        base_path = c.path_template.format(
-            schema_version=c.schema_version, **partitions
-        )
+        # Path template may need domain, subdomain from dataset_type
+        template_vars = {
+            "schema_version": c.schema_version,
+            "domain": c.dataset_type.domain.value if c.dataset_type.domain else "",
+            "subdomain": (
+                c.dataset_type.subdomain.value if c.dataset_type.subdomain else ""
+            ),
+            **partitions,
+        }
+        base_path = c.path_template.format(**template_vars)
 
         # Replace 'data/curated' with mode-specific prefix
         if base_path.startswith("data/curated/"):

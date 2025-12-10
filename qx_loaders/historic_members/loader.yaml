@@ -7,8 +7,8 @@ inputs:
   - name: membership_data
     required: true
     type:
-      domain: membership
-      subdomain: intervals
+      domain: instrument-reference
+      subdomain: index-constituents
     description: "Membership interval data"
 
 parameters:

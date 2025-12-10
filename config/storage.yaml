@@ -8,7 +8,7 @@ storage:
   # Environment mode: dev or prod
   # - dev: Isolated test environment with smaller datasets (data/dev/*)
   # - prod: Production research data (data/curated, data/processed)
-  mode: dev
+  mode: prod
 
 # Path configurations for different modes
 paths:

@@ -34,13 +34,18 @@ def dt_from_cfg(d: Dict) -> DatasetType:
     """
     try:
         validated = validate_dataset_type_config(d)
-        return DatasetType(
-            domain=validated["domain"],
-            asset_class=validated["asset_class"],
-            subdomain=validated["subdomain"],
-            region=validated["region"],
-            frequency=validated["frequency"],
-        )
+        kwargs = {}
+        if validated["domain"]:
+            kwargs["domain"] = Domain(validated["domain"])
+        if validated["asset_class"]:
+            kwargs["asset_class"] = AssetClass(validated["asset_class"])
+        if validated["subdomain"]:
+            kwargs["subdomain"] = Subdomain(validated["subdomain"])
+        if validated["region"]:
+            kwargs["region"] = Region(validated["region"])
+        if validated["frequency"]:
+            kwargs["frequency"] = Frequency(validated["frequency"])
+        return DatasetType(**kwargs)
     except EnumValidationError as e:
         raise ValueError(
             f"Invalid dataset type configuration in builder.yaml:\n{str(e)}\n"
@@ -95,6 +100,14 @@ class DataBuilderBase(abc.ABC):
         self.registry = registry
         self.adapter = adapter
 
+        # Set write mode if specified in parameters
+        write_mode = self.params.get("write_mode", "append")
+        if write_mode not in ["append", "overwrite"]:
+            raise ValueError(
+                f"Invalid write_mode '{write_mode}'. Must be 'append' or 'overwrite'"
+            )
+        self.write_mode = write_mode
+
         # Apply mode override if specified in builder.yaml
         # This allows packages to force a specific mode (e.g., reference data always uses prod)
         package_mode = self.info.get("mode")
@@ -120,6 +133,12 @@ class DataBuilderBase(abc.ABC):
         for k, s in spec.items():
             v = overrides.get(k, s.get("default"))
             t = s.get("type")
+
+            # Skip type conversion if value is None
+            if v is None:
+                out[k] = v
+                continue
+
             if t == "int":
                 v = int(v)
             elif t == "float":
@@ -252,7 +271,9 @@ class DataBuilderBase(abc.ABC):
                 # Write this partition
                 rel_dir = self.resolver.curated_dir(self.contract, partition_copy)
                 filename = f"part-{datetime.utcnow().strftime('%Y%m%dT%H%M%S')}.parquet"
-                path = self.adapter.write_batch(group_df, rel_dir, filename)
+                path = self.adapter.write_batch(
+                    group_df, rel_dir, filename, mode=self.write_mode
+                )
                 output_paths.append(path)
 
             return output_paths if len(output_paths) > 1 else output_paths[0]
@@ -260,4 +281,6 @@ class DataBuilderBase(abc.ABC):
             # All partition keys provided, write directly
             rel_dir = self.resolver.curated_dir(self.contract, partitions)
             filename = f"part-{datetime.utcnow().strftime('%Y%m%dT%H%M%S')}.parquet"
-            return self.adapter.write_batch(curated, rel_dir, filename)
+            return self.adapter.write_batch(
+                curated, rel_dir, filename, mode=self.write_mode
+            )

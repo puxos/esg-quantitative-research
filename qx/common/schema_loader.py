@@ -98,11 +98,9 @@ class SchemaLoader:
         "derived-metrics": Domain.DERIVED_METRICS,
         "portfolio": Domain.PORTFOLIO,
         "instrument-reference": Domain.INSTRUMENT_REFERENCE,
-        "membership": Domain.MEMBERSHIP,
         "metadata": Domain.METADATA,
         "data-products": Domain.DATA_PRODUCTS,
         # Legacy mappings for backward compatibility
-        "risk-free-rate": Domain.REFERENCE_RATES,
         "processed": Domain.DERIVED_METRICS,
     }
 

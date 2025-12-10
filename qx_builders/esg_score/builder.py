@@ -302,7 +302,7 @@ class ESGScoreBuilder(DataBuilderBase):
             actual_dt = DatasetType(
                 domain=Domain.ESG,
                 asset_class=AssetClass.EQUITY,
-                subdomain=Subdomain.ESG_SCORES_LEGACY,  # Use enum, not string
+                subdomain=Subdomain.ESG_SCORES,  # Use proper enum (esg-scores)
                 region=None,
                 frequency=Frequency.YEARLY,
             )

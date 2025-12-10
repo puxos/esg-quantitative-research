@@ -2,9 +2,9 @@
 # Point-in-time membership tracking (date, ticker pairs)
 
 dataset:
-  domain: membership
+  domain: instrument-reference
   asset_class: null
-  subdomain: daily
+  subdomain: index-constituents
   region: null
   frequency: null
 
@@ -43,7 +43,7 @@ contract:
       description: Filter to specific tickers
       example: ["AAPL", "MSFT", "GOOGL"]
 
-  path_template: data/curated/membership/universe={universe}/mode={mode}
+  path_template: data/curated/{domain}/{subdomain}/{schema_version}/universe={universe}/mode={mode}
 
 parameters: {}
 

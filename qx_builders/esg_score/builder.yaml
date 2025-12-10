@@ -48,6 +48,12 @@ parameters:
     allowed: ["US", "HK"]
     description: "Exchange for GVKEY mapping (US or HK)"
 
+  write_mode:
+    type: enum
+    default: "overwrite"
+    allowed: ["append", "overwrite"]
+    description: "Write mode - overwrite deletes existing files, append keeps them"
+
   use_ticker_mapper:
     type: bool
     default: true

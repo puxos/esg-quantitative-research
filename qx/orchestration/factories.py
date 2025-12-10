@@ -53,7 +53,6 @@ from qx.common.types import AssetClass, DatasetType, Domain, Frequency, Region
 from qx.engine.base_model import BaseModel
 from qx.engine.processed_writer import ProcessedWriterBase
 from qx.foundation.base_builder import DataBuilderBase
-from qx.foundation.typed_loader import TypedCuratedLoader
 from qx.storage.backend_local import LocalParquetBackend
 from qx.storage.pathing import PathResolver
 from qx.storage.table_format import TableFormatAdapter
@@ -274,7 +273,8 @@ def run_builder(
 def run_model(
     package_path: str,
     registry: DatasetRegistry,
-    loader: TypedCuratedLoader,
+    backend: LocalParquetBackend,
+    resolver: PathResolver,
     writer: ProcessedWriterBase,
     available_types: List[DatasetType],
     partitions: Optional[Dict[str, Dict[str, str]]] = None,
@@ -290,7 +290,8 @@ def run_model(
     Args:
         package_path: Path to model package directory (e.g., "qx_models/capm")
         registry: Dataset registry for resolving contracts
-        loader: Typed curated data loader
+        backend: Storage backend for reading curated data
+        resolver: Path resolver for constructing file paths
         writer: Processed data writer
         available_types: List of available dataset types for model inputs
         partitions: Partition filters by input name (e.g., {"risk_free": {"region": "US"}})
@@ -306,7 +307,8 @@ def run_model(
             run=run_model(
                 "qx_models/capm",
                 registry=registry,
-                loader=loader,
+                backend=backend,
+                resolver=resolver,
                 writer=writer,
                 available_types=[
                     DatasetType(Domain.MARKET_DATA, AssetClass.EQUITY, "ohlcv", Region.US, Frequency.DAILY),
@@ -360,7 +362,8 @@ def run_model(
         model = model_cls(
             package_dir=str(pkg_dir),
             registry=registry,
-            loader=loader,
+            backend=backend,
+            resolver=resolver,
             writer=writer,
             overrides=overrides or {},
         )

@@ -156,6 +156,14 @@ class USTreasuryRateLoader(BaseLoader):
         # Ensure date column is datetime
         all_data["date"] = pd.to_datetime(all_data["date"])
 
+        # Deduplicate in case multiple builder runs created duplicate files
+        # Keep the most recent record based on ingest_ts if available
+        if "ingest_ts" in all_data.columns:
+            all_data = all_data.sort_values("ingest_ts", ascending=False)
+        all_data = all_data.drop_duplicates(
+            subset=["date", "rate_type", "series_id"], keep="first"
+        )
+
         # Filter by date range
         treasury_df = all_data[
             (all_data["date"] >= pd.Timestamp(start_date))

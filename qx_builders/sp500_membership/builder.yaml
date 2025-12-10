@@ -6,9 +6,9 @@ builder:
 io:
   output:
     type:
-      domain: membership
+      domain: instrument-reference
       asset_class: null
-      subdomain: daily
+      subdomain: index-constituents
       region: null
       frequency: null
 
@@ -27,6 +27,12 @@ parameters:
     type: string
     default: "S&P 500 Historical Components & Changes(11-16-2025).csv"
     description: "Name of the raw CSV file"
+
+  write_mode:
+    type: enum
+    default: "overwrite"
+    allowed: ["append", "overwrite"]
+    description: "Write mode - overwrite deletes existing files, append keeps them"
 
 partitions:
   required:

@@ -2,9 +2,9 @@
 # Interval-based membership tracking (ticker, start_date, end_date)
 
 dataset:
-  domain: membership
+  domain: instrument-reference
   asset_class: null
-  subdomain: intervals
+  subdomain: index-constituents
   region: null
   frequency: null
 
@@ -50,7 +50,7 @@ contract:
       description: Filter intervals overlapping with date range
       example: ["2020-01-01", "2020-12-31"]
 
-  path_template: data/curated/membership/universe={universe}/mode={mode}
+  path_template: data/curated/{domain}/{subdomain}/{schema_version}/universe={universe}/mode={mode}
 
 parameters: {}
 

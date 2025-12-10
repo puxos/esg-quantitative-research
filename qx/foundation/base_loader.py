@@ -19,7 +19,6 @@ from typing import Any, Dict, Optional
 import yaml
 
 from qx.common.contracts import DatasetRegistry
-from qx.foundation.typed_loader import TypedCuratedLoader
 from qx.storage.backend_local import LocalParquetBackend
 from qx.storage.pathing import PathResolver
 
@@ -29,7 +28,7 @@ class BaseLoader:
     Base class for all loader packages.
 
     Loaders are lightweight data transformers that:
-    1. Read curated datasets via TypedCuratedLoader
+    1. Read curated datasets via direct file access
     2. Apply filters, selections, aggregations
     3. Return Python objects (List, Dict, DataFrame)
     4. Do NOT persist outputs (memory only)
@@ -143,10 +142,10 @@ class BaseLoader:
             else:
                 self.params[param_name] = None
 
-        # Create typed loader for reading curated data
-        self.curated_loader = TypedCuratedLoader(
-            registry=registry, backend=backend, resolver=resolver
-        )
+        # Store infrastructure for loaders that need direct file access
+        self.registry = registry
+        self.backend = backend
+        self.resolver = resolver
 
         # Validate parameters (optional, can be overridden)
         self._validate_parameters()

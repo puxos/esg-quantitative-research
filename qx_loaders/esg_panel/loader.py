@@ -56,7 +56,7 @@ from typing import List
 
 import pandas as pd
 
-from qx.common.types import AssetClass, DatasetType, Domain, Subdomain, Frequency
+from qx.common.types import AssetClass, DatasetType, Domain, Frequency, Subdomain
 from qx.foundation.base_loader import BaseLoader
 
 
@@ -114,8 +114,12 @@ class ESGPanelLoader(BaseLoader):
             print("⚠️  Empty symbol list, returning empty DataFrame")
             return pd.DataFrame()
 
-        # Load ESG scores from curated data
+        # Load ESG scores from curated data via direct file access
         # Note: ESG data is now YEARLY (one record per company per ESG publication year)
+        from pathlib import Path
+
+        import pyarrow.parquet as pq
+
         esg_type = DatasetType(
             domain=Domain.ESG,
             asset_class=AssetClass.EQUITY,
@@ -124,25 +128,38 @@ class ESGPanelLoader(BaseLoader):
             frequency=Frequency.YEARLY,
         )
 
-        # Use filter pushdown to load only required symbols
-        # ESG data is partitioned by esg_year (annual)
         # ESG years use 1-year lag: calendar 2014 → esg_year=2013
-        # For period 2014-2024, load esg_years 2013-2023 (both -1 to avoid look-ahead bias)
-        esg_years = range(
-            start_date.year - 1, end_date.year
-        )  # e.g., 2014-2024 → 2013-2023
+        # For period 2014-2024, load esg_years 2013-2023
+        esg_years = range(start_date.year - 1, end_date.year)
+
+        # Construct base path: data/curated/esg/esg_scores/schema_v1
+        base_path = Path("data/curated/esg/esg_scores/schema_v1")
 
         dfs = []
         for esg_year in esg_years:
-            df_year = self.curated_loader.load(
-                dt=esg_type,
-                partitions={"exchange": exchange, "esg_year": str(esg_year)},
-                filters={
-                    "ticker_list": symbols,  # Filter to requested symbols
-                },
-            )
-            if not df_year.empty:
-                dfs.append(df_year)
+            # Partition path: exchange={exchange}/esg_year={esg_year}
+            partition_path = base_path / f"exchange={exchange}" / f"esg_year={esg_year}"
+
+            if not partition_path.exists():
+                continue
+
+            # Read parquet files with PyArrow filter for symbols
+            files = list(partition_path.glob("*.parquet"))
+            if not files:
+                continue
+
+            # Use PyArrow filter pushdown for ticker filtering
+            arrow_filters = [("ticker", "in", symbols)]
+
+            for pq_file in files:
+                try:
+                    table = pq.read_table(str(pq_file), filters=arrow_filters)
+                    df_year = table.to_pandas()
+                    if not df_year.empty:
+                        dfs.append(df_year)
+                except Exception as e:
+                    print(f"⚠️  Error reading {pq_file}: {e}")
+                    continue
 
         # Combine all ESG years
         if not dfs:
@@ -150,6 +167,14 @@ class ESGPanelLoader(BaseLoader):
             return pd.DataFrame()
 
         df = pd.concat(dfs, ignore_index=True)
+
+        # Deduplicate in case multiple builder runs created duplicate files
+        if not df.empty:
+            if "ingest_ts" in df.columns:
+                df = df.sort_values("ingest_ts", ascending=False)
+            df = df.drop_duplicates(
+                subset=["ticker", "gvkey", "esg_year"], keep="first"
+            )
 
         if df.empty:
             print("⚠️  No ESG data found for specified symbols and period")

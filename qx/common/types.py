@@ -14,7 +14,6 @@ class Domain(Enum):
     PORTFOLIO = "portfolio"
     DATA_PRODUCTS = "data-products"
     METADATA = "metadata"
-    MEMBERSHIP = "membership"
 
 
 class AssetClass(Enum):
@@ -59,6 +58,7 @@ class Subdomain(Enum):
     IDENTIFIERS = "identifiers"
     EXCHANGES = "exchanges"
     CALENDARS = "calendars"
+    INDEX_CONSTITUENTS = "index-constituents"
 
     # Derived Metrics
     FACTORS = "factors"
@@ -86,8 +86,6 @@ class Subdomain(Enum):
     PORTFOLIO_WEIGHTS = "portfolio_weights"  # Legacy: maps to POSITIONS
     UNIVERSE_FILTER = "universe_filter"  # Legacy
     RETURNS = "returns"  # Legacy: maps to RISK_MODELS
-    DAILY = "daily"  # Legacy: membership data
-    INTERVALS = "intervals"  # Legacy: membership data
     GVKEY_MAPPING = "gvkey_mapping"  # Legacy: maps to IDENTIFIERS
     ESG_SCORES_LEGACY = "esg_scores"  # Legacy: maps to ESG_SCORES
 

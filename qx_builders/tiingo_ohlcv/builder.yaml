@@ -51,6 +51,12 @@ parameters:
     default: "USD"
     description: "Currency code (USD, HKD)"
 
+  write_mode:
+    type: enum
+    default: "overwrite"
+    allowed: ["append", "overwrite"]
+    description: "Write mode - overwrite deletes existing files, append keeps them"
+
   # Optional features
   market_proxy_symbols:
     type: list
