@@ -34,18 +34,34 @@ def dt_from_cfg(d: Dict) -> DatasetType:
     """
     try:
         validated = validate_dataset_type_config(d)
-        kwargs = {}
-        if validated["domain"]:
-            kwargs["domain"] = Domain(validated["domain"])
-        if validated["asset_class"]:
-            kwargs["asset_class"] = AssetClass(validated["asset_class"])
-        if validated["subdomain"]:
-            kwargs["subdomain"] = Subdomain(validated["subdomain"])
-        if validated["region"]:
-            kwargs["region"] = Region(validated["region"])
-        if validated["frequency"]:
-            kwargs["frequency"] = Frequency(validated["frequency"])
-        return DatasetType(**kwargs)
+
+        # Convert string values to enums (None if not provided)
+        domain = Domain(validated["domain"]) if validated.get("domain") else None
+        asset_class = (
+            AssetClass(validated["asset_class"])
+            if validated.get("asset_class")
+            else None
+        )
+        subdomain = (
+            Subdomain(validated["subdomain"]) if validated.get("subdomain") else None
+        )
+        region = Region(validated["region"]) if validated.get("region") else None
+        frequency = (
+            Frequency(validated["frequency"]) if validated.get("frequency") else None
+        )
+
+        # Domain is required, others are optional
+        if domain is None:
+            raise ValueError("Domain is required in io.output.type configuration")
+
+        # DatasetType requires all parameters (domain required, others can be None)
+        return DatasetType(
+            domain=domain,
+            asset_class=asset_class,
+            subdomain=subdomain,
+            region=region,
+            frequency=frequency,
+        )
     except EnumValidationError as e:
         raise ValueError(
             f"Invalid dataset type configuration in builder.yaml:\n{str(e)}\n"

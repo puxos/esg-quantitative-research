@@ -2,9 +2,9 @@
 # Global Company Key to ticker symbol mapping (metadata)
 
 dataset:
-  domain: metadata
+  domain: instrument-reference
   asset_class: null
-  subdomain: gvkey_mapping
+  subdomain: identifiers
   region: null
   frequency: null
 
@@ -48,7 +48,7 @@ contract:
       description: Filter to specific GVKEYs
       example: [1690, 12141, 14593]
 
-  path_template: data/curated/metadata/gvkey_mapping/{schema_version}/exchange={exchange}
+  path_template: data/curated/{domain}/{subdomain}/gvkey/{schema_version}/exchange={exchange}
 
 parameters:
   exchange:

@@ -4,7 +4,7 @@
 dataset:
   domain: market-data
   asset_class: equity
-  subdomain: ohlcv
+  subdomain: bar
   frequency: null  # Parameterized
 
 contract:

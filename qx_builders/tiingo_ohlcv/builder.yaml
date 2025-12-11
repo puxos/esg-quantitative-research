@@ -8,7 +8,7 @@ io:
     type:
       domain: market-data
       asset_class: equity
-      subdomain: ohlcv
+      subdomain: bar
       frequency: null  # Partitioned separately
 
 parameters:

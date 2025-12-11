@@ -75,7 +75,6 @@ class Subdomain(Enum):
     DASHBOARD_FEEDS = "dashboard-feeds"
 
     # Legacy/Generic subdomains (for backward compatibility)
-    OHLCV = "ohlcv"  # Legacy: maps to BARS
     TREASURY_RATE = "treasury_rate"  # Legacy: maps to BENCHMARK_RATES
     ZERO_RATE = "zero_rate"  # Legacy: maps to YIELD_CURVES
     PREDICTIONS = "predictions"  # Legacy: maps to RISK_MODELS
@@ -86,7 +85,6 @@ class Subdomain(Enum):
     PORTFOLIO_WEIGHTS = "portfolio_weights"  # Legacy: maps to POSITIONS
     UNIVERSE_FILTER = "universe_filter"  # Legacy
     RETURNS = "returns"  # Legacy: maps to RISK_MODELS
-    GVKEY_MAPPING = "gvkey_mapping"  # Legacy: maps to IDENTIFIERS
     ESG_SCORES_LEGACY = "esg_scores"  # Legacy: maps to ESG_SCORES
 
 

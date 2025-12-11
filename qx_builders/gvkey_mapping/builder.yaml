@@ -6,9 +6,9 @@ builder:
 io:
   output:
     type:
-      domain: metadata
+      domain: instrument-reference
       asset_class: null
-      subdomain: gvkey_mapping
+      subdomain: identifiers
       frequency: null
 
 parameters:
