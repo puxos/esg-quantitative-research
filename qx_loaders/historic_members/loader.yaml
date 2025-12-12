@@ -1,5 +1,5 @@
 loader:
-  id: historic_members
+  id: historic_members_loader
   version: 1.0.0
   description: "Get all symbols that were members of a universe during a period (including removed members)"
 

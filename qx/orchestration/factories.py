@@ -311,8 +311,8 @@ def run_model(
                 resolver=resolver,
                 writer=writer,
                 available_types=[
-                    DatasetType(Domain.MARKET_DATA, AssetClass.EQUITY, "ohlcv", Region.US, Frequency.DAILY),
-                    DatasetType(Domain.REFERENCE_RATES, None, "zero_rate", Region.US, Frequency.DAILY),
+                    DatasetType(Domain.MARKET_DATA, AssetClass.EQUITY, Subdomain.BARS, Region.US, Frequency.MONTHLY),
+                    DatasetType(Domain.REFERENCE_RATES, None, Subdomain.YIELD_CURVES, Region.US, Frequency.MONTHLY),
                 ],
                 partitions={"risk_free": {"region": "US"}},
                 run_id="run-001",

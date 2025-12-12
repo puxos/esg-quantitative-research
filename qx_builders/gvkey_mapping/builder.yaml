@@ -1,5 +1,5 @@
 builder:
-  id: gvkey_mapping
+  id: gvkey_mapping_builder
   version: 1.0.0
   description: "GVKEY-ticker mapping builder - creates mapping from GVKEY identifiers to ticker symbols"
 

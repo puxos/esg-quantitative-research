@@ -4,7 +4,7 @@
 dataset:
   domain: market-data
   asset_class: equity
-  subdomain: bar
+  subdomain: bars
   frequency: null  # Parameterized
 
 contract:

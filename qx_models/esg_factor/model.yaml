@@ -1,5 +1,5 @@
 model:
-  id: esg_factor
+  id: esg_factor_model
   version: 1.0.0
   featureset_id: ohlcv_v1+esg_v1+rf_v1
   description: |
@@ -30,10 +30,10 @@ io:
       type:
         domain: market-data
         asset_class: equity
-        subdomain: ohlcv
+        subdomain: bars
         region: US
-        frequency: D
-      description: "Daily OHLCV price data (will be resampled to monthly)"
+        frequency: monthly
+      description: "Monthly OHLCV price data (resampled from daily)"
 
     # Input 2: ESG scores (curated)
     - name: esg_scores
@@ -41,7 +41,7 @@ io:
       type:
         domain: esg
         asset_class: equity
-        subdomain: esg_scores
+        subdomain: esg-scores
         region: null
         frequency: null
       description: "Annual ESG scores (esg_year with 'year' column for availability)"
@@ -51,12 +51,11 @@ io:
       required: true
       type:
         domain: reference-rates
-        asset_class: null
-        subdomain: zero_rate
+        asset_class: fixed-income
+        subdomain: yield-curves
         region: US
-        frequency: D
-      description: "Daily risk-free rates (will be resampled to monthly)"
-
+        frequency: monthly
+      description: "Monthly risk-free rates (resampled from daily)"
     # Input 4: Universe filter (optional processed)
     - name: universe_filter
       required: false
@@ -75,7 +74,7 @@ io:
     type:
       domain: derived-metrics
       asset_class: equity
-      subdomain: esg_factors
+      subdomain: factors
       region: null
       frequency: null
     description: |

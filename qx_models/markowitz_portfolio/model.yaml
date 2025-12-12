@@ -83,10 +83,10 @@ io:
       required: true
       type:
         domain: reference-rates
-        asset_class: null
-        subdomain: zero_rate
+        asset_class: fixed-income
+        subdomain: yield-curves
         region: US
-        frequency: daily
+        frequency: monthly
       description: |
         Risk-free rate for calculating excess returns.
         Used in covariance estimation (excess return covariance).

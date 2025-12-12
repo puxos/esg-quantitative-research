@@ -66,9 +66,9 @@ class ContinuousUniverseLoader(BaseLoader):
         from pathlib import Path
 
         membership_type = DatasetType(
-            domain=Domain.MEMBERSHIP,
+            domain=Domain.INSTRUMENT_REFERENCE,
             asset_class=None,
-            subdomain=Subdomain.INTERVALS,
+            subdomain=Subdomain.INDEX_CONSTITUENTS,
             region=None,
             frequency=None,
         )

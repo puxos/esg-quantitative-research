@@ -1,5 +1,5 @@
 loader:
-  id: ohlcv_panel
+  id: ohlcv_panel_loader
   version: 1.0.0
   description: "Load OHLCV price data for a list of symbols with date range filtering"
 
@@ -9,7 +9,7 @@ inputs:
     type:
       domain: market-data
       asset_class: equity
-      subdomain: ohlcv
+      subdomain: bars
     description: "OHLCV price data from curated data"
 
 parameters:

@@ -2,7 +2,7 @@
 # Builds ESG scores from local Excel/CSV files with GVKEY mapping
 
 builder:
-  id: esg_score
+  id: esg_score_builder
   version: 1.0.0
   description: |
     Fetches ESG (Environmental, Social, Governance) scores from local files.

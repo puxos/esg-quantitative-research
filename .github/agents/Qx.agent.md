@@ -106,11 +106,11 @@ Built around three layers—**Data**, **Model**, and **Orchestration**—with st
 
 - **Curated market data (equities OHLCV):**
   - `DatasetType`:  
-    `domain=market-data, asset_class=equity, subdomain=ohlcv, region=US|HK, frequency=D|W|M`
+    `domain=market-data, asset_class=equity, subdomain=bars, region=US|HK, frequency=D|W|M`
   - Partitions: `(region, frequency, date, exchange)`
 - **Curated risk-free (zero curve):**
   - `DatasetType`:  
-    `domain=reference-rates, subdomain=zero_rate, region=US|HK, frequency=D`
+    `domain=reference-rates, subdomain=yield-curves, region=US|HK, frequency=D`
   - Partitions: `(region, date, curve_id)`
 - **Processed predictions (generic):**
   - `DatasetType`:  
@@ -132,17 +132,17 @@ io:
       type:
         domain: market-data
         asset_class: equity
-        subdomain: ohlcv
+        subdomain: bars
         region: US
-        frequency: D
+        frequency: monthly
     - name: risk_free
       required: true
       type:
         domain: reference-rates
-        asset_class: null
-        subdomain: zero_rate
+        asset_class: fixed-income
+        subdomain: yield-curves
         region: US
-        frequency: D
+        frequency: monthly
   output:
     type:
       domain: processed
@@ -258,7 +258,7 @@ conf/
 
 ## Quick Tips
 
-- Keep `subdomain` names stable (e.g., `ohlcv`, `zero_rate`, `fundamentals_income`).
+- Keep `subdomain` names stable (e.g., `bars`, `yield-curves`, `fundamentals_income`).
 - Version schemas via `schema_version` folder segments (e.g., `schema_v1`)—never mutate history.
 - Always write **immutable processed outputs** (new `run_id` partitions); **do not overwrite**.
 - Enforce strict input types in **`model.yaml`** to achieve true **lego-style** composition.

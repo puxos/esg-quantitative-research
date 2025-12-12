@@ -1,5 +1,5 @@
 loader:
-  id: esg_panel
+  id: esg_panel_loader
   version: 1.0.0
   description: "Load ESG scores for a list of symbols with optional continuity filtering"
 
@@ -9,7 +9,7 @@ inputs:
     type:
       domain: esg
       asset_class: equity
-      subdomain: esg_scores
+      subdomain: esg-scores
     description: "ESG scores from curated data"
 
 parameters:

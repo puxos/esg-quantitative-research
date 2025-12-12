@@ -114,7 +114,7 @@ class OHLCVPanelLoader(BaseLoader):
         ohlcv_type = DatasetType(
             domain=Domain.MARKET_DATA,
             asset_class=AssetClass.EQUITY,
-            subdomain=Subdomain.OHLCV,
+            subdomain=Subdomain.BARS,
             region=None,
             frequency=freq_enum,
         )

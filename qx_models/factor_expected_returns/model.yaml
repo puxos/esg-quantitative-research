@@ -67,10 +67,10 @@ io:
       required: true
       type:
         domain: reference-rates
-        asset_class: null
-        subdomain: zero_rate
+        asset_class: fixed-income
+        subdomain: yield-curves
         region: US
-        frequency: D
+        frequency: monthly
       description: |
         Risk-free rate time-series (US Treasury rates).
         Resampled to monthly frequency for expected return calculations.
@@ -81,9 +81,9 @@ io:
       type:
         domain: derived-metrics
         asset_class: equity
-        subdomain: esg_factors
+        subdomain: factors
         region: null
-        frequency: null
+        frequency: monthly
       description: |
         ESG factor returns from esg_factor model.
         Used to estimate ESG risk premium (λ_ESG) via HAC-robust mean.

@@ -1,5 +1,5 @@
 loader:
-  id: continuous_universe
+  id: continuous_universe_loader
   version: 1.0.0
   description: "Select symbols that were continuously in a universe during a period"
 
@@ -7,8 +7,9 @@ inputs:
   - name: membership_data
     required: true
     type:
-      domain: membership
-      subdomain: intervals
+      domain: instrument-reference
+      asset_class: null
+      subdomain: index-constituents
     description: "Membership interval data"
 
 parameters:

@@ -22,9 +22,9 @@ io:
       type:
         domain: market-data
         asset_class: equity
-        subdomain: ohlcv
+        subdomain: bars
         region: US
-        frequency: Monthly
+        frequency: monthly
       description: "Monthly OHLCV price data (will be resampled to target frequency)"
 
     # Input 2: Risk-free rate (curated) - optional for excess returns
@@ -32,10 +32,10 @@ io:
       required: false
       type:
         domain: reference-rates
-        asset_class: null
-        subdomain: zero_rate
+        asset_class: fixed-income
+        subdomain: yield-curves
         region: US
-        frequency: Monthly
+        frequency: monthly
       description: "Monthly risk-free rates (will be resampled to target frequency for excess returns)"
 
   output:

@@ -75,17 +75,12 @@ class Subdomain(Enum):
     DASHBOARD_FEEDS = "dashboard-feeds"
 
     # Legacy/Generic subdomains (for backward compatibility)
-    TREASURY_RATE = "treasury_rate"  # Legacy: maps to BENCHMARK_RATES
-    ZERO_RATE = "zero_rate"  # Legacy: maps to YIELD_CURVES
     PREDICTIONS = "predictions"  # Legacy: maps to RISK_MODELS
-    CONTINUOUS_MEMBERS = "continuous_members"  # Legacy
-    ESG_FACTORS = "esg_factors"  # Legacy: maps to FACTORS
     TWO_FACTOR_BETAS = "two_factor_betas"  # Legacy: maps to RISK_MODELS
     FACTOR_EXPECTED_RETURNS = "factor_expected_returns"  # Legacy
     PORTFOLIO_WEIGHTS = "portfolio_weights"  # Legacy: maps to POSITIONS
     UNIVERSE_FILTER = "universe_filter"  # Legacy
     RETURNS = "returns"  # Legacy: maps to RISK_MODELS
-    ESG_SCORES_LEGACY = "esg_scores"  # Legacy: maps to ESG_SCORES
 
 
 class Region(Enum):

@@ -5,7 +5,7 @@
 # Assumes data has been built by the us_treasury_rate builder.
 
 loader:
-  id: us_treasury_rate
+  id: us_treasury_rate_loader
   version: 1.0.0
   description: "Load US Treasury rates (risk-free rates) for financial models"
 
@@ -15,8 +15,8 @@ io:
       required: true
       type:
         domain: reference-rates
-        asset_class: null
-        subdomain: treasury_rate
+        asset_class: fixed-income
+        subdomain: yield-curves
         region: US
         frequency: null  # Will be specified via parameters
 

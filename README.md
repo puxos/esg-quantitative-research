@@ -99,11 +99,11 @@ conf/
 
 - **Curated market data (equities OHLCV):**
   - `DatasetType`:  
-    `domain=market-data, asset_class=equity, subdomain=ohlcv, region=US|HK, frequency=D|W|M`
+    `domain=market-data, asset_class=equity, subdomain=bars, region=US|HK, frequency=daily|weekly|monthly`
   - Partitions: `(region, frequency, date, exchange)`
 - **Curated risk-free (zero curve):**
   - `DatasetType`:  
-    `domain=reference-rates, subdomain=zero_rate, region=US|HK, frequency=D`
+    `domain=reference-rates, subdomain=yield-curves, region=US|HK, frequency=D`
   - Partitions: `(region, date, curve_id)`
 - **Processed predictions (generic):**
   - `DatasetType`:  

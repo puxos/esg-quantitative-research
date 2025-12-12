@@ -2,7 +2,7 @@
 # Fetches US Treasury rates from FRED API
 
 builder:
-  id: us_treasury_rate
+  id: us_treasury_rate_builder
   version: 1.0.0
   description: |
     Fetches US Treasury constant maturity rates from Federal Reserve Economic Data (FRED).
@@ -13,7 +13,7 @@ io:
   output:
     type:
       domain: reference-rates
-      asset_class: null
+      asset_class: fixed-income
       subdomain: yield-curves
       region: US  # Hardcoded: US-specific (FRED API)
       frequency: null  # Partitioned (daily/weekly/monthly)

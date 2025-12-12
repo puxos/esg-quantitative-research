@@ -1,5 +1,5 @@
 loader:
-  id: universe_at_date
+  id: universe_at_date_loader
   version: 1.0.0
   description: "Select symbols that were in universe on a specific date"
 
@@ -7,8 +7,8 @@ inputs:
   - name: membership_data
     required: true
     type:
-      domain: membership
-      subdomain: intervals
+      domain: instrument-reference
+      subdomain: index-constituents
     description: "Membership interval data"
 
 parameters:

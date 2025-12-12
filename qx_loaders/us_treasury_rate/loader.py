@@ -118,8 +118,8 @@ class USTreasuryRateLoader(BaseLoader):
 
         # Load data from curated storage
         # Treasury data is partitioned by rate_type and frequency
-        # Path: data/curated/risk-free/treasury_rate/schema_v1/rate_type={rate_type}/frequency={frequency}/
-        base_path = Path("data/curated/risk-free/treasury_rate/schema_v1")
+        # Path: data/curated/reference-rates/yield-curves/region=US/treasury_rate/schema_v1/rate_type={rate_type}/frequency={frequency}/
+        base_path = Path("data/curated/reference-rates/yield-curves/region=US/treasury_rate/schema_v1")
 
         all_dfs = []
         for rate_type in rate_types:

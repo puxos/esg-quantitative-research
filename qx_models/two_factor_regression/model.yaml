@@ -43,10 +43,10 @@ io:
       type:
         domain: market-data
         asset_class: equity
-        subdomain: ohlcv
+        subdomain: bars
         region: US
-        frequency: daily
-      description: "Daily SPY OHLCV data (market proxy, will be resampled to monthly)"
+        frequency: monthly
+      description: "Monthly SPY bar data (market proxy)"
 
     # Input 3: ESG factors (from ESGFactorModel)
     - name: esg_factors
@@ -54,9 +54,9 @@ io:
       type:
         domain: derived-metrics
         asset_class: equity
-        subdomain: esg_factors
+        subdomain: factors
         region: null
-        frequency: null
+        frequency: monthly
       description: "Monthly ESG factor returns (output from ESGFactorModel)"
 
     # Input 4: Risk-free rate
@@ -64,11 +64,11 @@ io:
       required: true
       type:
         domain: reference-rates
-        asset_class: null
-        subdomain: zero_rate
+        asset_class: fixed-income
+        subdomain: yield-curves
         region: US
-        frequency: D
-      description: "Daily risk-free rates (will be resampled to monthly)"
+        frequency: monthly
+      description: "Monthly risk-free rates"
 
   output:
     type:
@@ -76,7 +76,7 @@ io:
       asset_class: equity
       subdomain: two_factor_betas
       region: null
-      frequency: null
+      frequency: monthly
     description: |
       Factor exposures (betas) and alpha from two-factor regression.
 

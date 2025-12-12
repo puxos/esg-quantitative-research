@@ -5,7 +5,7 @@
 # benchmarking, and risk calculations.
 
 loader:
-  id: market_proxy
+  id: market_proxy_loader
   version: 1.0.0
   description: "Load market proxy OHLCV prices (SPY by default) for benchmarking and factor models"
 
@@ -16,7 +16,7 @@ io:
       type:
         domain: market-data
         asset_class: equity
-        subdomain: ohlcv
+        subdomain: bars
         region: null
         frequency: null  # Will be specified via parameters
 

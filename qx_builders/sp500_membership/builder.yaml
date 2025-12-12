@@ -1,5 +1,5 @@
 builder:
-  id: sp500_membership
+  id: sp500_membership_builder
   version: 1.0.0
   description: "S&P 500 historical membership builder - transforms raw CSV into curated daily membership data"
 
