@@ -1,5 +1,5 @@
 """
-Two-Factor Regression Model Implementation
+Market + ESG Two-Factor OLS Regression Model Implementation
 
 Migrated from legacy TwoFactorRegression (src/programs/two_factor_regression.py)
 to Qx BaseModel architecture.
@@ -20,9 +20,9 @@ from qx.engine.base_model import BaseModel
 logger = logging.getLogger(__name__)
 
 
-class TwoFactorRegressionModel(BaseModel):
+class MarketESGRegressionModel(BaseModel):
     """
-    Two-Factor OLS Regression Model: Market + ESG
+    Market + ESG Two-Factor OLS Regression Model
 
     Estimates factor exposures (betas) and alpha for each stock using OLS regression.
     Supports both cross-sectional (full sample) and time-series (rolling window) analysis.
@@ -206,7 +206,7 @@ class TwoFactorRegressionModel(BaseModel):
         monthly["return"] = monthly.groupby("symbol")["close"].pct_change()
 
         # Resample RF to monthly
-        rf_monthly = TwoFactorRegressionModel._resample_rf_to_monthly(rf_df)
+        rf_monthly = MarketESGRegressionModel._resample_rf_to_monthly(rf_df)
 
         # Merge and calculate excess returns
         stock_excess = monthly[["date", "symbol", "return"]].dropna()
@@ -232,7 +232,7 @@ class TwoFactorRegressionModel(BaseModel):
         market_monthly["market_return"] = market_monthly["close"].pct_change()
 
         # Resample RF to monthly
-        rf_monthly = TwoFactorRegressionModel._resample_rf_to_monthly(rf_df)
+        rf_monthly = MarketESGRegressionModel._resample_rf_to_monthly(rf_df)
 
         # Calculate excess returns
         market_excess = market_monthly[["date", "market_return"]].dropna()
@@ -352,7 +352,7 @@ class TwoFactorRegressionModel(BaseModel):
         for i in range(window_months, len(data) + 1):
             window_data = data.iloc[i - window_months : i]
 
-            result = TwoFactorRegressionModel._run_single_regression(
+            result = MarketESGRegressionModel._run_single_regression(
                 window_data, symbol, use_hac_se=use_hac_se, hac_maxlags=hac_maxlags
             )
 

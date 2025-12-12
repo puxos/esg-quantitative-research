@@ -1,9 +1,9 @@
 model:
-  id: two_factor_regression
+  id: market_esg_regression_model
   version: 1.0.0
   featureset_id: ohlcv_v1+esg_factors_v1+rf_v1
   description: |
-    Two-Factor OLS Regression: Market + ESG
+    Market + ESG Two-Factor OLS Regression:
 
     Estimates factor exposures (betas) and Jensen's alpha using OLS regression:
       Excess_Return = α + β_market * Market_Excess + β_ESG * ESG_Factor + ε
@@ -32,7 +32,7 @@ io:
       type:
         domain: market-data
         asset_class: equity
-        subdomain: ohlcv
+        subdomain: bars
         region: US
         frequency: daily
       description: "Daily stock OHLCV data (will be resampled to monthly)"
@@ -74,7 +74,8 @@ io:
     type:
       domain: derived-metrics
       asset_class: equity
-      subdomain: two_factor_betas
+      subdomain: models
+      subtype: market-esg-betas
       region: null
       frequency: monthly
     description: |

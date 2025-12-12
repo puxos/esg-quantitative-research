@@ -1,5 +1,5 @@
 from qx.common.contracts import DatasetContract, DatasetRegistry
-from qx.common.types import AssetClass, DatasetType, Domain, Frequency
+from qx.common.types import AssetClass, DatasetType, Domain, Subdomain, Frequency
 from qx_builders.esg_score import get_esg_scores_contract
 from qx_builders.gvkey_mapping import get_gvkey_mapping_contract
 
@@ -13,9 +13,9 @@ from qx_builders.us_treasury_rate import get_us_treasury_rate_contract
 
 # Import schema functions from model packages
 from qx_models.esg_factor import get_esg_factors_contract
-from qx_models.factor_expected_returns import get_factor_expected_returns_contract
+from qx_models.esg_extended_capm import get_factor_expected_returns_contract
+from qx_models.market_esg_regression import get_market_esg_betas_contract
 from qx_models.markowitz_portfolio import get_portfolio_weights_contract
-from qx_models.two_factor_regression import get_two_factor_betas_contract
 
 
 def seed_registry(reg: DatasetRegistry):
@@ -46,7 +46,7 @@ def seed_registry(reg: DatasetRegistry):
 
     # Derived metrics predictions (generic)
     dt_out = DatasetType(
-        Domain.DERIVED_METRICS, AssetClass.EQUITY, "predictions", None, None
+        Domain.DERIVED_METRICS, AssetClass.EQUITY, Subdomain.MODELS, None, None
     )
     reg.register(
         DatasetContract(
@@ -118,7 +118,7 @@ def seed_registry(reg: DatasetRegistry):
 
     # Two-Factor Betas (TwoFactorRegressionModel output)
     # Market beta and ESG beta from OLS regression
-    reg.register(get_two_factor_betas_contract())
+    reg.register(get_market_esg_betas_contract())
 
     # Factor Expected Returns (FactorExpectedReturnsModel output)
     # Expected returns using factor model: E[R] = RF + β'λ

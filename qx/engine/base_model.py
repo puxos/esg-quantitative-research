@@ -6,7 +6,14 @@ import pandas as pd
 import yaml
 
 from qx.common.contracts import DatasetContract, DatasetRegistry
-from qx.common.types import AssetClass, DatasetType, Domain, Subdomain, Frequency, Region
+from qx.common.types import (
+    AssetClass,
+    DatasetType,
+    Domain,
+    Frequency,
+    Region,
+    Subdomain,
+)
 from qx.engine.processed_writer import ProcessedWriterBase
 
 

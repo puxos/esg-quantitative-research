@@ -119,11 +119,12 @@ io:
         frequency: monthly
   output:
     type:
-      domain: processed
+      domain: derived-metrics
       asset_class: equity
-      subdomain: predictions
+      subdomain: models
+      subtype: capm
       region: null
-      frequency: null
+      frequency: monthly
 
 parameters:
   horizon_d:

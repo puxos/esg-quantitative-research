@@ -1,5 +1,5 @@
 model:
-  id: factor_expected_returns
+  id: esg_extended_capm_model
   version: 1.0.0
   featureset_id: two_factor_betas_v1+market_ohlcv_v1+rf_v1
   description: |
@@ -29,14 +29,15 @@ model:
 io:
   inputs:
     # Two-factor betas (market and ESG exposures from regression)
-    - name: two_factor_betas
+    - name: market_esg_betas
       required: true
       type:
         domain: derived-metrics
         asset_class: equity
-        subdomain: two_factor_betas
+        subdomain: models
+        subtype: market-esg-betas
         region: null
-        frequency: null
+        frequency: monthly
       description: |
         Pre-computed factor betas from two_factor_regression model.
         Contains: symbol, date, beta_market, beta_esg
@@ -55,9 +56,9 @@ io:
       type:
         domain: market-data
         asset_class: equity
-        subdomain: ohlcv
+        subdomain: bars
         region: US
-        frequency: D
+        frequency: monthly
       description: |
         Market portfolio proxy (SPY) for calculating market excess returns.
         Used to estimate market risk premium (λ_market) via HAC-robust mean.
@@ -93,9 +94,10 @@ io:
     type:
       domain: derived-metrics
       asset_class: equity
-      subdomain: factor_expected_returns
+      subdomain: models
+      subtype: capm
       region: null
-      frequency: null
+      frequency: monthly
     description: |
       Expected returns for each stock at each forecast date.
 

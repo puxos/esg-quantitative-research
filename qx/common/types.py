@@ -74,16 +74,6 @@ class Subdomain(Enum):
     # Data Products
     RESEARCH_EXPORTS = "research-exports"
     DASHBOARD_FEEDS = "dashboard-feeds"
-
-    # Legacy/Generic subdomains (for backward compatibility)
-    PREDICTIONS = "predictions"  # Legacy: maps to RISK_MODELS
-    TWO_FACTOR_BETAS = "two_factor_betas"  # Legacy: maps to RISK_MODELS
-    FACTOR_EXPECTED_RETURNS = "factor_expected_returns"  # Legacy
-    PORTFOLIO_WEIGHTS = "portfolio_weights"  # Legacy: maps to POSITIONS
-    UNIVERSE_FILTER = "universe_filter"  # Legacy
-    RETURNS = "returns"  # Legacy: maps to RISK_MODELS
-
-
 class Region(Enum):
     """Geographic/market regions (used in DatasetType for contract identity)"""
 

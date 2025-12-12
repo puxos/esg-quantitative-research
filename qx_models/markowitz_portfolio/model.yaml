@@ -1,5 +1,5 @@
 model:
-  id: markowitz_portfolio
+  id: markowitz_portfolio_model
   version: 1.0.0
   featureset_id: expected_returns_v1+two_factor_betas_v1+ohlcv_v1
   description: |
@@ -39,11 +39,12 @@ io:
       type:
         domain: derived-metrics
         asset_class: equity
-        subdomain: factor_expected_returns
+        subdomain: models
+        subtype: capm
         region: null
-        frequency: null
+        frequency: monthly
       description: |
-        Expected returns from factor_expected_returns model.
+        Expected returns from CAPM model.
         Used as μ in mean-variance optimization objective.
 
         Must contain: symbol, date, ER_monthly
@@ -110,7 +111,7 @@ io:
     type:
       domain: derived-metrics
       asset_class: equity
-      subdomain: portfolio_weights
+      subdomain: positions
       region: null
       frequency: null
     description: |

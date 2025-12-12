@@ -1,14 +1,14 @@
 """
-Two-Factor Regression Model - Output Schema Definition
+Market + ESG Two-Factor Regression Model - Output Schema Definition
 
 Defines the output contract for factor exposures (market beta and ESG beta).
 """
 
 from qx.common.contracts import DatasetContract
-from qx.common.types import AssetClass, DatasetType, Domain
+from qx.common.types import AssetClass, DatasetType, Domain, Subdomain
 
 
-def get_two_factor_betas_contract() -> DatasetContract:
+def get_market_esg_betas_contract() -> DatasetContract:
     """
     Get the dataset contract for two-factor regression betas.
 
@@ -30,7 +30,8 @@ def get_two_factor_betas_contract() -> DatasetContract:
     dt = DatasetType(
         domain=Domain.DERIVED_METRICS,
         asset_class=AssetClass.EQUITY,
-        subdomain="two_factor_betas",
+        subdomain=Subdomain.MODELS,
+        subtype="market-esg-regression",
         region=None,
         frequency=None,
     )

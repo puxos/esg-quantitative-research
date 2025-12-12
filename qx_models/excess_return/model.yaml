@@ -42,7 +42,7 @@ io:
     type:
       domain: derived-metrics
       asset_class: equity
-      subdomain: returns
+      subdomain: factors
       region: null
       frequency: null
     description: |
