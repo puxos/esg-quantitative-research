@@ -238,7 +238,7 @@ if __name__ == "__main__":
         registry=registry,
         backend=backend,
         resolver=resolver,
-        params={
+        overrides={
             "start_date": "2024-01-01",
             "end_date": "2024-01-31",
             "rate_types": ["3month", "10year"],

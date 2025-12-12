@@ -18,7 +18,7 @@ class ProcessedWriterBase:
     def write(self, df: pd.DataFrame, output_type: str, model: str) -> str:
         run_date = pd.to_datetime(df["run_ts"].iloc[0]).strftime("%Y-%m-%d")
         out_dt = DatasetType(
-            Domain.DERIVED_METRICS, AssetClass.EQUITY, output_type, None, None
+            Domain.DERIVED_METRICS, AssetClass.EQUITY, output_type, None, None, None
         )
         c = self.registry.find(out_dt)
         rel_dir = self.resolver.processed_dir(

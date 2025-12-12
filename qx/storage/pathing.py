@@ -123,6 +123,7 @@ class PathResolver:
             "subdomain": (
                 c.dataset_type.subdomain.value if c.dataset_type.subdomain else ""
             ),
+            "subtype": c.dataset_type.subtype if c.dataset_type.subtype else "",
             **partitions,
         }
         base_path = c.path_template.format(**template_vars)

@@ -45,6 +45,7 @@ def dt_from_cfg(d: Dict) -> DatasetType:
         subdomain = (
             Subdomain(validated["subdomain"]) if validated.get("subdomain") else None
         )
+        subtype = validated.get("subtype")  # Custom string, no enum conversion
         region = Region(validated["region"]) if validated.get("region") else None
         frequency = (
             Frequency(validated["frequency"]) if validated.get("frequency") else None
@@ -59,6 +60,7 @@ def dt_from_cfg(d: Dict) -> DatasetType:
             domain=domain,
             asset_class=asset_class,
             subdomain=subdomain,
+            subtype=subtype,
             region=region,
             frequency=frequency,
         )
@@ -235,6 +237,7 @@ class DataBuilderBase(abc.ABC):
                     domain=actual_dt.domain,
                     asset_class=actual_dt.asset_class,
                     subdomain=actual_dt.subdomain,
+                    subtype=actual_dt.subtype,
                     region=actual_dt.region,
                     frequency=frequency,
                     dims=actual_dt.dims,

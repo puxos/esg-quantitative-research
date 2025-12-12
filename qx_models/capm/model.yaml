@@ -1,5 +1,5 @@
 model:
-  id: capm
+  id: capm_model
   version: 1.0.0
   featureset_id: ohlcv_v1+rf_v1
   description: "CAPM expected return using daily OHLCV and daily risk-free"
@@ -23,12 +23,13 @@ io:
         subdomain: yield-curves
         region: US
         frequency: monthly
-      description: "Monthly risk-free rates (will be resampled to target frequency for excess returns
+      description: "Monthly risk-free rates (will be resampled to target frequency for excess returns"
   output:
     type:
       domain: derived-metrics
       asset_class: equity
-      subdomain: predictions
+      subdomain: models
+      subtype: capm
       region: null
       frequency: null
 

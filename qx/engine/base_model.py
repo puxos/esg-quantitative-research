@@ -24,6 +24,7 @@ def dt_from_cfg(d: Dict) -> DatasetType:
         _enum(Domain, d["domain"]),
         _enum(AssetClass, d.get("asset_class")),
         _enum(Subdomain, d.get("subdomain")),
+        d.get("subtype"),  # Custom string, no enum conversion
         _enum(Region, d.get("region")),
         _enum(Frequency, d.get("frequency")),
     )

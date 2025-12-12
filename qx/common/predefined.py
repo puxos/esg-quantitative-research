@@ -16,7 +16,6 @@ from qx_models.esg_factor import get_esg_factors_contract
 from qx_models.factor_expected_returns import get_factor_expected_returns_contract
 from qx_models.markowitz_portfolio import get_portfolio_weights_contract
 from qx_models.two_factor_regression import get_two_factor_betas_contract
-from qx_models.universe_filter import get_universe_filter_contract
 
 
 def seed_registry(reg: DatasetRegistry):
@@ -38,6 +37,7 @@ def seed_registry(reg: DatasetRegistry):
             domain=base_contract.dataset_type.domain,
             asset_class=base_contract.dataset_type.asset_class,
             subdomain=base_contract.dataset_type.subdomain,
+            subtype=base_contract.dataset_type.subtype,
             region=base_contract.dataset_type.region,  # US (hardcoded)
             frequency=freq,  # Vary by frequency
         )
@@ -127,7 +127,3 @@ def seed_registry(reg: DatasetRegistry):
     # Portfolio Weights (MarkowitzPortfolioModel output)
     # Optimal portfolio allocations from mean-variance optimization
     reg.register(get_portfolio_weights_contract())
-
-    # Universe Filter (UniverseFilterModel output)
-    # Filtered universe with continuous ESG score coverage
-    reg.register(get_universe_filter_contract())

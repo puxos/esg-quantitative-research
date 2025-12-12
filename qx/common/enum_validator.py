@@ -173,6 +173,9 @@ def validate_dataset_type_config(config: Dict[str, Any]) -> Dict[str, Optional[E
         Subdomain, config.get("subdomain"), "subdomain", allow_none=False
     )
 
+    # Subtype (optional, custom string - no enum validation)
+    validated["subtype"] = config.get("subtype")  # Pass-through, not restricted
+
     # Validate region (optional, used in partitions)
     validated["region"] = validate_enum_value(
         Region, config.get("region"), "region", allow_none=True

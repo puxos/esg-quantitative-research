@@ -55,6 +55,7 @@ class SchemaLoader:
           domain: market-data | reference-rates | fundamentals | corporate-actions | esg | derived-metrics | portfolio | instrument-reference | metadata | membership | data-products
           asset_class: equity | bond | commodity | null
           subdomain: string (e.g., "bars", "benchmark-rates", "esg-scores")
+          subtype: string (optional, custom subtype, not enum-restricted)
 
         contract:
           schema_version: string (e.g., "schema_v1")
@@ -200,6 +201,7 @@ class SchemaLoader:
         domain = self._parse_domain(dataset_section.get("domain"))
         asset_class = self._parse_asset_class(dataset_section.get("asset_class"))
         subdomain = self._parse_subdomain(dataset_section.get("subdomain"))
+        subtype = dataset_section.get("subtype")  # Custom string, no enum validation
 
         # Handle parameterized region/frequency (for contract-level identity)
         region = self._parse_region(dataset_section.get("region"), params.get("region"))
@@ -211,6 +213,7 @@ class SchemaLoader:
             domain=domain,
             asset_class=asset_class,
             subdomain=subdomain,
+            subtype=subtype,
             region=region,
             frequency=frequency,
         )

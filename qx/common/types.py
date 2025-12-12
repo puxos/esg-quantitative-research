@@ -63,6 +63,7 @@ class Subdomain(Enum):
     # Derived Metrics
     FACTORS = "factors"
     RISK_MODELS = "risk-models"
+    MODELS = "models"
     EVENT_STUDIES = "event-studies"
 
     # Portfolio
@@ -119,6 +120,7 @@ class DatasetType:
     - domain: Data category (market-data, reference-rates, esg, derived-metrics, etc.)
     - asset_class: Asset type (equity, fx, fixed-income, commodity, etc.)
     - subdomain: Specific data subdomain (bars, benchmark-rates, esg-scores, factors, etc.)
+    - subtype: Custom subtype string (optional, not enum-restricted, for fine-grained classification)
     - region: Geographic/market region (US, HK, GLOBAL) - used for contract identity
     - frequency: Temporal frequency (daily, weekly, monthly, etc.)
     - dims: Additional dimensions for typed datasets
@@ -129,6 +131,7 @@ class DatasetType:
     domain: Domain
     asset_class: Optional[AssetClass]
     subdomain: Optional[Subdomain]
-    region: Optional[Region]  # Contract-level: US, HK, GLOBAL
-    frequency: Optional[Frequency]
+    subtype: Optional[str] = None  # Custom string, not enum-restricted
+    region: Optional[Region] = None  # Contract-level: US, HK, GLOBAL
+    frequency: Optional[Frequency] = None
     dims: Tuple[Tuple[str, str], ...] = field(default_factory=tuple)
