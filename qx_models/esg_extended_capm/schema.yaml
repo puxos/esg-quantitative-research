@@ -1,0 +1,181 @@
+# Factor Expected Returns Model - Output Schema
+# Expected returns from factor model (market + ESG)
+
+dataset:
+  domain: derived-metrics
+  asset_class: equity
+  subdomain: models
+  subtype: factor-expected-returns
+  region: null
+  frequency: null
+
+contract:
+  schema_version: schema_v1
+
+  columns:
+    - name: symbol
+      type: string
+      description: Stock ticker symbol
+      required: true
+      filterable: true
+      filter_type: in
+
+    - name: date
+      type: date
+      description: Forecast date (monthly)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: beta_date
+      type: date
+      description: Date when beta was estimated (for time-varying betas)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: beta_market
+      type: float
+      description: Market beta (original, uncapped)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: beta_esg
+      type: float
+      description: ESG beta (original, uncapped)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: beta_market_capped
+      type: float
+      description: Market beta after capping (if cap_betas=true)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: beta_esg_capped
+      type: float
+      description: ESG beta after capping (if cap_betas=true)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: RF
+      type: float
+      description: Risk-free rate (monthly decimal)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: ER_monthly
+      type: float
+      description: Expected return (monthly decimal)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: ER_annual
+      type: float
+      description: Expected return (annualized, compound)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: lambda_market
+      type: float
+      description: Market risk premium (monthly decimal)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: lambda_esg
+      type: float
+      description: ESG risk premium (monthly decimal)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: model
+      type: string
+      description: Model ID (auto-added by BaseModel)
+      required: true
+      filterable: true
+      filter_type: in
+
+    - name: model_version
+      type: string
+      description: Model version (auto-added by BaseModel)
+      required: true
+      filterable: false
+
+    - name: featureset_id
+      type: string
+      description: Input featureset ID (auto-added by BaseModel)
+      required: true
+      filterable: false
+
+    - name: run_id
+      type: string
+      description: Unique run identifier (auto-added by BaseModel)
+      required: true
+      filterable: false
+
+    - name: run_ts
+      type: string
+      description: Run timestamp ISO 8601 (auto-added by BaseModel)
+      required: true
+      filterable: true
+      filter_type: range
+
+  partition_keys:
+    - output_type
+    - model
+    - run_date
+
+  filters:
+    symbol_list:
+      columns: [symbol]
+      type: in
+      description: Filter to specific symbols
+      example: ["AAPL", "MSFT", "GOOGL"]
+
+    date_range:
+      columns: [date]
+      type: range
+      description: Filter by forecast date range
+      example: ["2020-01-01", "2024-12-31"]
+
+    expected_return_range:
+      columns: [ER_monthly]
+      type: range
+      description: Filter by expected return range
+      example: [0, 0.05]
+
+    beta_market_range:
+      columns: [beta_market]
+      type: range
+      description: Filter by market beta range
+      example: [0, 2]
+
+  path_template: data/processed/{output_type}/model={model}/run_date={run_date}
+
+metadata:
+  source: Factor Expected Returns Model (Extended CAPM)
+  description: |
+    Expected returns calculated from factor exposures and risk premia.
+
+    Model:
+      E[R_i] = RF + β_market * λ_market + β_ESG * λ_ESG
+
+    Features:
+    - Uses factor exposures from two-factor regression
+    - Estimates factor premia from factor returns (Fama-MacBeth or historical)
+    - Optional beta capping to handle outliers
+    - Includes both monthly and annualized returns
+
+  notes: |
+    Beta capping (if enabled) applies symmetric bounds to prevent extreme values.
+    Factor premia stored in output for reproducibility and analysis.
+    ER_annual = (1 + ER_monthly)^12 - 1 (compound annualization)

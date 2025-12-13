@@ -1,0 +1,126 @@
+# ESG Factor Model - Output Schema
+# Long-short factor returns based on ESG signals
+
+dataset:
+  domain: derived-metrics
+  asset_class: equity
+  subdomain: models
+  subtype: factors
+  region: null
+  frequency: null
+
+contract:
+  schema_version: schema_v1
+
+  columns:
+    - name: date
+      type: date
+      description: Monthly observation date
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: factor_name
+      type: string
+      description: Factor identifier (ESG, E, S, G, ESG_mom)
+      required: true
+      filterable: true
+      filter_type: in
+
+    - name: factor_return
+      type: float
+      description: Long-short excess return (monthly decimal)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: long_return
+      type: float
+      description: Long leg excess return
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: short_return
+      type: float
+      description: Short leg excess return
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: model
+      type: string
+      description: Model ID (auto-added by BaseModel)
+      required: true
+      filterable: true
+      filter_type: in
+
+    - name: model_version
+      type: string
+      description: Model version (auto-added by BaseModel)
+      required: true
+      filterable: false
+
+    - name: featureset_id
+      type: string
+      description: Input featureset ID (auto-added by BaseModel)
+      required: true
+      filterable: false
+
+    - name: run_id
+      type: string
+      description: Unique run identifier (auto-added by BaseModel)
+      required: true
+      filterable: false
+
+    - name: run_ts
+      type: string
+      description: Run timestamp ISO 8601 (auto-added by BaseModel)
+      required: true
+      filterable: true
+      filter_type: range
+
+  partition_keys:
+    - output_type
+    - model
+    - run_date
+
+  filters:
+    date_range:
+      columns: [date]
+      type: range
+      description: Filter by observation date range
+      example: ["2020-01-01", "2024-12-31"]
+
+    factor_list:
+      columns: [factor_name]
+      type: in
+      description: Filter to specific factors
+      example: ["ESG", "E", "S"]
+
+    return_range:
+      columns: [factor_return]
+      type: range
+      description: Filter by factor return range
+      example: [-0.05, 0.05]
+
+  path_template: data/processed/{output_type}/model={model}/run_date={run_date}
+
+metadata:
+  source: ESG Factor Model
+  description: |
+    Monthly ESG factor returns constructed from long-short portfolios.
+
+    Factors:
+    - ESG: Composite ESG score factor
+    - E: Environmental pillar factor
+    - S: Social pillar factor
+    - G: Governance pillar factor
+    - ESG_mom: ESG momentum factor (YoY changes)
+
+    Returns are excess returns (risk-free adjusted).
+    Portfolio construction: ranks stocks by signal, longs top quantile, shorts bottom quantile.
+
+  notes: |
+    Output includes both factor returns and individual leg returns (long/short).
+    All returns are excess returns (risk-free rate already subtracted).

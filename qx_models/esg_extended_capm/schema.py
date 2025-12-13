@@ -2,8 +2,13 @@
 Schema definition for Factor Expected Returns Model output
 """
 
+from pathlib import Path
+
 from qx.common.contracts import DatasetContract
-from qx.common.types import AssetClass, DatasetType, Domain
+from qx.common.schema_loader import load_contract
+
+# Path to YAML schema definition
+SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
 
 
 def get_factor_expected_returns_contract() -> DatasetContract:
@@ -57,43 +62,4 @@ def get_factor_expected_returns_contract() -> DatasetContract:
     Returns:
         DatasetContract for factor expected returns output
     """
-    dt = DatasetType(
-        domain=Domain.DERIVED_METRICS,
-        asset_class=AssetClass.EQUITY,
-        subdomain="factor_expected_returns",
-        region=None,
-        frequency=None,
-    )
-
-    return DatasetContract(
-        dataset_type=dt,
-        schema_version="schema_v1",
-        required_columns=(
-            # Identifiers
-            "symbol",
-            "date",
-            "beta_date",  # When beta was estimated (for time-varying betas)
-            # Factor exposures (original)
-            "beta_market",
-            "beta_esg",
-            # Factor exposures (capped)
-            "beta_market_capped",
-            "beta_esg_capped",
-            # Risk-free rate
-            "RF",  # Monthly decimal
-            # Expected returns
-            "ER_monthly",  # Monthly decimal
-            "ER_annual",  # Annualized (compound): (1 + ER_monthly)^12 - 1
-            # Factor premia (for reproducibility and analysis)
-            "lambda_market",  # Monthly decimal
-            "lambda_esg",  # Monthly decimal
-            # Model metadata
-            "model",
-            "model_version",
-            "featureset_id",
-            "run_id",
-            "run_ts",
-        ),
-        partition_keys=("output_type", "model", "run_date"),
-        path_template="data/processed/{output_type}/model={model}/run_date={run_date}",
-    )
+    return load_contract(SCHEMA_PATH)

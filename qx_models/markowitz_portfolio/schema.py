@@ -2,8 +2,13 @@
 Schema definition for Markowitz Portfolio Optimization output
 """
 
+from pathlib import Path
+
 from qx.common.contracts import DatasetContract
-from qx.common.types import AssetClass, DatasetType, Domain
+from qx.common.schema_loader import load_contract
+
+# Path to YAML schema definition
+SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
 
 
 def get_portfolio_weights_contract() -> DatasetContract:
@@ -63,49 +68,4 @@ def get_portfolio_weights_contract() -> DatasetContract:
     Returns:
         DatasetContract for portfolio weights output
     """
-    dt = DatasetType(
-        domain=Domain.DERIVED_METRICS,
-        asset_class=AssetClass.EQUITY,
-        subdomain="portfolio_weights",
-        region=None,
-        frequency=None,
-    )
-
-    return DatasetContract(
-        dataset_type=dt,
-        schema_version="schema_v1",
-        required_columns=(
-            # Identifiers
-            "symbol",
-            "optimization_date",
-            # Portfolio allocation
-            "weight",
-            # Expected metrics (per stock)
-            "exp_return_monthly",
-            "exp_return_annual",
-            # Risk metrics (per stock)
-            "esg_beta",
-            "sector",  # May be null if sector_mapping not provided
-            # Portfolio-level statistics
-            "portfolio_return_monthly",
-            "portfolio_return_annual",
-            "portfolio_vol_monthly",
-            "portfolio_vol_annual",
-            "portfolio_sharpe",
-            "portfolio_esg_exposure",
-            "portfolio_concentration_top10",
-            "n_positions",
-            # Optimization parameters
-            "gamma",
-            "esg_lower_bound",  # May be null
-            "esg_upper_bound",  # May be null
-            # Model metadata
-            "model",
-            "model_version",
-            "featureset_id",
-            "run_id",
-            "run_ts",
-        ),
-        partition_keys=("output_type", "model", "run_date"),
-        path_template="data/processed/{output_type}/model={model}/run_date={run_date}",
-    )
+    return load_contract(SCHEMA_PATH)

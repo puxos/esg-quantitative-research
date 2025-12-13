@@ -4,8 +4,13 @@ ESG Factor Model - Output Schema Definition
 Defines the output contract for ESG factor returns.
 """
 
+from pathlib import Path
+
 from qx.common.contracts import DatasetContract
-from qx.common.types import AssetClass, DatasetType, Domain
+from qx.common.schema_loader import load_contract
+
+# Path to YAML schema definition
+SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
 
 
 def get_esg_factors_contract() -> DatasetContract:
@@ -17,33 +22,6 @@ def get_esg_factors_contract() -> DatasetContract:
     - Momentum factor: ESG_mom (long-short based on YoY ESG score changes)
 
     Returns:
-        DatasetContract for processed/equity/esg_factors
+        DatasetContract for processed/equity/factors
     """
-    dt = DatasetType(
-        domain=Domain.DERIVED_METRICS,
-        asset_class=AssetClass.EQUITY,
-        subdomain="esg_factors",
-        region=None,
-        frequency=None,
-    )
-
-    return DatasetContract(
-        dataset_type=dt,
-        schema_version="schema_v1",
-        required_columns=(
-            # Business columns
-            "date",  # Monthly observation date
-            "factor_name",  # Factor identifier (ESG, E, S, G, ESG_mom)
-            "factor_return",  # Long-short excess return
-            "long_return",  # Long leg excess return
-            "short_return",  # Short leg excess return
-            # Metadata (auto-added by BaseModel)
-            "model",  # "esg_factor"
-            "model_version",  # e.g., "1.0.0"
-            "featureset_id",  # e.g., "ohlcv_v1+esg_v1+rf_v1"
-            "run_id",  # Unique run identifier
-            "run_ts",  # Run timestamp
-        ),
-        partition_keys=("output_type", "model", "run_date"),
-        path_template="data/processed/{output_type}/model={model}/run_date={run_date}",
-    )
+    return load_contract(SCHEMA_PATH)

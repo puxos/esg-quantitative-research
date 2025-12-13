@@ -1,0 +1,221 @@
+# Market + ESG Two-Factor Regression Model - Output Schema
+# Factor exposures (market beta and ESG beta) from OLS regression
+
+dataset:
+  domain: derived-metrics
+  asset_class: equity
+  subdomain: models
+  subtype: market-esg-regression
+  region: null
+  frequency: null
+
+contract:
+  schema_version: schema_v1
+
+  columns:
+    - name: symbol
+      type: string
+      description: Stock ticker symbol
+      required: true
+      filterable: true
+      filter_type: in
+
+    - name: date
+      type: date
+      description: Regression end date (cross-sectional = end of sample, time-series = window end)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: alpha
+      type: float
+      description: Jensen's alpha - abnormal return (monthly decimal)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: beta_market
+      type: float
+      description: Market beta - sensitivity to market factor
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: beta_esg
+      type: float
+      description: ESG beta - sensitivity to ESG factor
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: alpha_tstat
+      type: float
+      description: Alpha t-statistic
+      required: true
+      filterable: false
+
+    - name: beta_market_tstat
+      type: float
+      description: Market beta t-statistic
+      required: true
+      filterable: false
+
+    - name: beta_esg_tstat
+      type: float
+      description: ESG beta t-statistic
+      required: true
+      filterable: false
+
+    - name: alpha_pvalue
+      type: float
+      description: Alpha p-value
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: beta_market_pvalue
+      type: float
+      description: Market beta p-value
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: beta_esg_pvalue
+      type: float
+      description: ESG beta p-value
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: r_squared
+      type: float
+      description: R² - goodness of fit
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: adj_r_squared
+      type: float
+      description: Adjusted R²
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: f_statistic
+      type: float
+      description: F-statistic for joint significance
+      required: true
+      filterable: false
+
+    - name: f_pvalue
+      type: float
+      description: F-statistic p-value
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: observations
+      type: int
+      description: Number of observations used in regression
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: std_error_alpha
+      type: float
+      description: Standard error of alpha (HAC-robust)
+      required: true
+      filterable: false
+
+    - name: std_error_beta_market
+      type: float
+      description: Standard error of market beta (HAC-robust)
+      required: true
+      filterable: false
+
+    - name: std_error_beta_esg
+      type: float
+      description: Standard error of ESG beta (HAC-robust)
+      required: true
+      filterable: false
+
+    - name: model
+      type: string
+      description: Model ID (auto-added by BaseModel)
+      required: true
+      filterable: true
+      filter_type: in
+
+    - name: model_version
+      type: string
+      description: Model version (auto-added by BaseModel)
+      required: true
+      filterable: false
+
+    - name: featureset_id
+      type: string
+      description: Input featureset ID (auto-added by BaseModel)
+      required: true
+      filterable: false
+
+    - name: run_id
+      type: string
+      description: Unique run identifier (auto-added by BaseModel)
+      required: true
+      filterable: false
+
+    - name: run_ts
+      type: string
+      description: Run timestamp ISO 8601 (auto-added by BaseModel)
+      required: true
+      filterable: true
+      filter_type: range
+
+  partition_keys:
+    - output_type
+    - model
+    - run_date
+
+  filters:
+    symbol_list:
+      columns: [symbol]
+      type: in
+      description: Filter to specific symbols
+      example: ["AAPL", "MSFT", "GOOGL"]
+
+    date_range:
+      columns: [date]
+      type: range
+      description: Filter by regression end date range
+      example: ["2020-01-01", "2024-12-31"]
+
+    beta_market_range:
+      columns: [beta_market]
+      type: range
+      description: Filter by market beta range
+      example: [0, 2]
+
+    significant_alpha:
+      columns: [alpha_pvalue]
+      type: range
+      description: Filter for significant alpha (p-value < 0.05)
+      example: [0, 0.05]
+
+  path_template: data/processed/{output_type}/model={model}/run_date={run_date}
+
+metadata:
+  source: Market + ESG Two-Factor Regression Model
+  description: |
+    OLS regression estimates of factor exposures (betas) and alpha.
+
+    Regression model:
+      R_i,t - RF_t = α_i + β_market * (R_market,t - RF_t) + β_ESG * ESG_factor_t + ε_i,t
+
+    Supports:
+    - Cross-sectional: One estimate per stock (full sample)
+    - Time-series: Rolling window estimates per stock
+    - HAC-robust standard errors (Newey-West)
+
+  notes: |
+    All statistics include HAC-robust standard errors for heteroskedasticity and autocorrelation.
+    Use window_months parameter to control cross-sectional vs time-series analysis.
