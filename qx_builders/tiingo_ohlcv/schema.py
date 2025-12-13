@@ -40,3 +40,23 @@ def get_tiingo_ohlcv_contract(exchange: str, frequency: Frequency) -> DatasetCon
         # → DatasetContract for US daily OHLCV data
     """
     return load_contract(SCHEMA_PATH, exchange=exchange, frequency=frequency)
+
+
+def get_tiingo_ohlcv_contracts() -> list[DatasetContract]:
+    """
+    Get contracts for all Tiingo OHLCV frequencies (US exchange).
+
+    Auto-registration helper - returns all frequency variants for US market.
+
+    Returns:
+        List of DatasetContract instances for US exchange (daily, weekly, monthly)
+
+    Example:
+        contracts = get_tiingo_ohlcv_contracts()
+        # → [US daily, US weekly, US monthly]
+    """
+    return [
+        get_tiingo_ohlcv_contract("US", Frequency.DAILY),
+        get_tiingo_ohlcv_contract("US", Frequency.WEEKLY),
+        get_tiingo_ohlcv_contract("US", Frequency.MONTHLY),
+    ]

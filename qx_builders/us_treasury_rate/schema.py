@@ -37,3 +37,41 @@ def get_us_treasury_rate_contract() -> DatasetContract:
         # → DatasetContract for US treasury rates
     """
     return load_contract(SCHEMA_PATH)
+
+
+def get_us_treasury_rate_contracts() -> list[DatasetContract]:
+    """
+    Get contracts for all US Treasury rate frequencies.
+
+    Auto-registration helper - returns frequency-specific contracts.
+    Since the YAML schema doesn't have a frequency parameter, we manually
+    create variants with different frequencies in the DatasetType.
+
+    Returns:
+        List of DatasetContract instances (daily, weekly, monthly)
+
+    Example:
+        contracts = get_us_treasury_rate_contracts()
+        # → [daily, weekly, monthly treasury contracts]
+    """
+    from dataclasses import replace
+
+    from qx.common.types import DatasetType, Frequency
+
+    base_contract = load_contract(SCHEMA_PATH)
+
+    contracts = []
+    for freq in (Frequency.DAILY, Frequency.WEEKLY, Frequency.MONTHLY):
+        # Create contract with specific frequency in dataset_type
+        updated_type = DatasetType(
+            domain=base_contract.dataset_type.domain,
+            asset_class=base_contract.dataset_type.asset_class,
+            subdomain=base_contract.dataset_type.subdomain,
+            subtype=base_contract.dataset_type.subtype,
+            region=base_contract.dataset_type.region,  # US (hardcoded in YAML)
+            frequency=freq,
+        )
+        contract = replace(base_contract, dataset_type=updated_type)
+        contracts.append(contract)
+
+    return contracts
