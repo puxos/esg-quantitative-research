@@ -47,7 +47,7 @@ class BaseModel(abc.ABC):
     ):
         """
         Initialize model from package directory.
-        
+
         Args:
             package_dir: Path to model package containing model.yaml
             loader: High-level typed curated data loader (contains registry, backend, resolver)

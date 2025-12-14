@@ -24,11 +24,11 @@ from qx.storage.table_format import TableFormatAdapter
 class CuratedWriter:
     """
     High-level interface for writing curated datasets.
-    
+
     Encapsulates backend + adapter + resolver to provide a clean API
     for builders. Handles path resolution, partitioning, and persistence.
     """
-    
+
     def __init__(
         self,
         backend: LocalParquetBackend,
@@ -38,7 +38,7 @@ class CuratedWriter:
     ):
         """
         Initialize curated writer.
-        
+
         Args:
             backend: Storage backend for file operations
             adapter: Table format adapter for writing data
@@ -49,7 +49,7 @@ class CuratedWriter:
         self.adapter = adapter
         self.resolver = resolver
         self.registry = registry
-    
+
     def write(
         self,
         dataset_type: DatasetType,
@@ -60,17 +60,17 @@ class CuratedWriter:
     ) -> str:
         """
         Write curated dataset using type + contract.
-        
+
         Args:
             dataset_type: Dataset type identifier
             data: DataFrame to write
             partitions: Partition values (e.g., {"exchange": "US", "frequency": "daily"})
             run_id: Optional run identifier for filename
             write_mode: Write mode ("append" or "overwrite")
-        
+
         Returns:
             Path where data was written
-        
+
         Raises:
             ValueError: If contract not found or data doesn't match schema
         """
@@ -78,30 +78,30 @@ class CuratedWriter:
         contract = self.registry.get_contract(dataset_type)
         if not contract:
             raise ValueError(f"No contract found for {dataset_type}")
-        
+
         # Validate required columns
         missing_cols = set(contract.required_columns) - set(data.columns)
         if missing_cols:
             raise ValueError(
                 f"Data missing required columns for {dataset_type}: {missing_cols}"
             )
-        
+
         # Resolve output path
         output_path = self.resolver.resolve_path(
             contract=contract,
             partitions=partitions or {},
             run_id=run_id,
         )
-        
+
         # Write data
         self.adapter.write(
             data=data,
             path=output_path,
             write_mode=write_mode,
         )
-        
+
         return str(output_path)
-    
+
     def write_to_path(
         self,
         data: pd.DataFrame,
@@ -110,12 +110,12 @@ class CuratedWriter:
     ) -> str:
         """
         Write data to explicit path (for non-contract writes).
-        
+
         Args:
             data: DataFrame to write
             path: Output path
             write_mode: Write mode ("append" or "overwrite")
-        
+
         Returns:
             Path where data was written
         """
