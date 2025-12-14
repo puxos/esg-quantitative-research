@@ -1,8 +1,36 @@
+# ==============================================================================
+# YAML Structure Clarification
+# ==============================================================================
+# This YAML follows a clear separation of concerns:
+#
+# 1. `inputs`: Curated datasets required (resolved via DatasetType contracts)
+#    - These are persistent datasets from the data lake
+#    - Loaded via TypedCuratedLoader with type safety
+#    - Example: membership data, OHLCV prices, ESG scores
+#
+# 2. `parameters`: Configuration values (not datasets)
+#    - These are runtime config: dates, thresholds, flags
+#    - Provided via `overrides` when invoking the task
+#    - Example: start_date, end_date, universe name
+#
+# 3. `runtime_dependencies` (optional): Task outputs from other tasks
+#    - NOT curated datasets, but outputs from loaders/tasks in the DAG
+#    - Used when a task needs results from another task's execution
+#    - Example: A builder needs symbol list from a loader task
+#    - Note: Most tasks don't need this - it's for special cases
+#
+# 4. `output`: What this task produces
+#    - For loaders: in-memory objects (List, Dict, DataFrame)
+#    - For builders: curated datasets (persisted to data lake)
+#    - For models: processed datasets (persisted to processed layer)
+# ==============================================================================
+
 loader:
   id: historic_members_loader
   version: 1.0.0
   description: "Get all symbols that were members of a universe during a period (including removed members)"
 
+# Curated datasets required (resolved via DatasetType contracts)
 inputs:
   - name: membership_data
     required: true
@@ -11,6 +39,7 @@ inputs:
       subdomain: index-constituents
     description: "Membership interval data"
 
+# Configuration parameters (not datasets)
 parameters:
   start_date:
     type: str
@@ -44,6 +73,14 @@ parameters:
       - Avoiding duplicate positions in portfolios
       - Data fetching (Tiingo migrates data to new tickers)
 
+# Optional: Runtime dependencies (task outputs, not curated datasets)
+# runtime_dependencies:
+#   - task_id: "BuildMembershipIntervals"
+#     description: "Requires membership intervals to be built first"
+# Note: This loader doesn't need runtime_dependencies because it reads
+# from curated data (declared in `inputs`), not from task outputs.
+
+# Output specification
 output:
   type: list
   item_type: str

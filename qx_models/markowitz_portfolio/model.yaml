@@ -39,8 +39,8 @@ io:
       type:
         domain: derived-metrics
         asset_class: equity
-        subdomain: models
-        subtype: capm
+        subdomain: expected-returns
+        subtype: null
         region: null
         frequency: monthly
       description: |
@@ -55,7 +55,8 @@ io:
       type:
         domain: derived-metrics
         asset_class: equity
-        subdomain: two_factor_betas
+        subdomain: factor-exposures
+        subtype: null
         region: null
         frequency: null
       description: |
@@ -71,6 +72,7 @@ io:
         domain: market-data
         asset_class: equity
         subdomain: ohlcv
+        subtype: null
         region: US
         frequency: daily
       description: |

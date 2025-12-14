@@ -110,7 +110,31 @@ def run_loader(
     if not loader_py.exists():
         raise FileNotFoundError(f"loader.py not found in {package_path}")
 
-    def task_callable() -> Dict:
+    # Extract input requirements from loader.yaml (if any)
+    import yaml
+
+    from qx.engine.base_model import dt_from_cfg
+
+    with open(loader_yaml, "r") as f:
+        loader_config = yaml.safe_load(f)
+
+    # Check if loader has curated data inputs
+    input_requirements = []
+    if "inputs" in loader_config:
+        for inp in loader_config["inputs"]:
+            input_requirements.append(
+                {
+                    "name": inp["name"],
+                    "type": dt_from_cfg(inp["type"]),
+                    "required": inp.get("required", True),
+                    "description": inp.get("description", ""),
+                }
+            )
+
+    # Determine if this loader needs auto-injection
+    needs_auto_injection = len(input_requirements) > 0
+
+    def task_callable(available_types: Optional[List[DatasetType]] = None) -> Dict:
         """Execute loader package and return manifest with output."""
         # Dynamic import of loader module
         from qx.foundation.base_loader import BaseLoader
@@ -145,8 +169,11 @@ def run_loader(
             overrides=overrides or {},
         )
 
-        # Execute loader
-        output = loader.load()
+        # Execute loader (pass available_types if loader needs auto-injection)
+        if needs_auto_injection and available_types is not None:
+            output = loader.load(available_types=available_types)
+        else:
+            output = loader.load()
 
         # Determine output type for manifest
         output_type = type(output).__name__
@@ -168,6 +195,11 @@ def run_loader(
             "output_size": output_size,
             "output": output,  # Store actual output for downstream tasks
         }
+
+    # Attach metadata for DAG validation (if loader has curated inputs)
+    if input_requirements:
+        task_callable.input_requirements = input_requirements
+        task_callable._loader_package_path = package_path
 
     return task_callable
 
@@ -223,7 +255,33 @@ def run_builder(
     if not builder_py.exists():
         raise FileNotFoundError(f"builder.py not found in {package_path}")
 
-    def task_callable() -> Dict:
+    # Extract output type and input requirements from builder.yaml
+    import yaml
+
+    from qx.foundation.base_builder import dt_from_cfg
+
+    with open(builder_yaml, "r") as f:
+        builder_config = yaml.safe_load(f)
+
+    output_type = dt_from_cfg(builder_config["io"]["output"]["type"])
+
+    # Check if builder has curated data inputs
+    input_requirements = []
+    if "inputs" in builder_config.get("io", {}):
+        for inp in builder_config["io"]["inputs"]:
+            input_requirements.append(
+                {
+                    "name": inp["name"],
+                    "type": dt_from_cfg(inp["type"]),
+                    "required": inp.get("required", True),
+                    "description": inp.get("description", ""),
+                }
+            )
+
+    # Determine if this builder needs auto-injection
+    needs_auto_injection = len(input_requirements) > 0
+
+    def task_callable(available_types: Optional[List[DatasetType]] = None) -> Dict:
         """Execute builder and return task manifest."""
         # Dynamic import of builder module
         module_name = f"builder_mod_{pkg_dir.name}"
@@ -256,8 +314,13 @@ def run_builder(
             overrides=overrides or {},
         )
 
-        # Execute build
-        output_path = builder.build(partitions=partitions or {})
+        # Execute build (pass available_types if builder needs auto-injection)
+        if needs_auto_injection and available_types is not None:
+            output_path = builder.build(
+                partitions=partitions or {}, available_types=available_types
+            )
+        else:
+            output_path = builder.build(partitions=partitions or {})
 
         return {
             "status": "success",
@@ -266,6 +329,12 @@ def run_builder(
             "output_path": output_path,
             "layer": "curated",
         }
+
+    # Attach metadata for DAG validation
+    task_callable.output_types = [output_type]
+    if input_requirements:
+        task_callable.input_requirements = input_requirements
+    task_callable._builder_package_path = package_path
 
     return task_callable
 
@@ -276,7 +345,6 @@ def run_model(
     backend: LocalParquetBackend,
     resolver: PathResolver,
     writer: ProcessedWriterBase,
-    available_types: List[DatasetType],
     partitions: Optional[Dict[str, Dict[str, str]]] = None,
     run_id: Optional[str] = None,
     overrides: Optional[Dict] = None,
@@ -287,13 +355,14 @@ def run_model(
     Dynamically loads a model package (model.yaml + model.py) and returns
     a callable that executes the model when invoked.
 
+    Dataset types are automatically injected by the DAG from dependency outputs.
+
     Args:
         package_path: Path to model package directory (e.g., "qx_models/capm")
         registry: Dataset registry for resolving contracts
         backend: Storage backend for reading curated data
         resolver: Path resolver for constructing file paths
         writer: Processed data writer
-        available_types: List of available dataset types for model inputs
         partitions: Partition filters by input name (e.g., {"risk_free": {"region": "US"}})
         run_id: Run identifier for output tracking
         overrides: Parameter overrides (e.g., {"horizon_d": 252})
@@ -310,10 +379,6 @@ def run_model(
                 backend=backend,
                 resolver=resolver,
                 writer=writer,
-                available_types=[
-                    DatasetType(Domain.MARKET_DATA, AssetClass.EQUITY, Subdomain.BARS, Region.US, Frequency.MONTHLY),
-                    DatasetType(Domain.REFERENCE_RATES, None, Subdomain.YIELD_CURVES, Region.US, Frequency.MONTHLY),
-                ],
                 partitions={"risk_free": {"region": "US"}},
                 run_id="run-001",
                 overrides={"horizon_d": 252}
@@ -334,8 +399,34 @@ def run_model(
     if not model_py.exists():
         raise FileNotFoundError(f"model.py not found in {package_path}")
 
-    def task_callable() -> Dict:
-        """Execute model and return task manifest."""
+    # Extract output type and input requirements from model.yaml for DAG validation
+    import yaml
+
+    from qx.engine.base_model import dt_from_cfg
+
+    with open(model_yaml, "r") as f:
+        model_config = yaml.safe_load(f)
+
+    output_type = dt_from_cfg(model_config["io"]["output"]["type"])
+
+    # Extract input requirements for DAG validation
+    input_requirements = [
+        {
+            "name": inp["name"],
+            "type": dt_from_cfg(inp["type"]),
+            "required": inp.get("required", True),
+            "description": inp.get("description", ""),
+        }
+        for inp in model_config["io"].get("inputs", [])
+    ]
+
+    def task_callable(available_types: List[DatasetType]) -> Dict:
+        """
+        Execute model with auto-injected dataset types.
+
+        Args:
+            available_types: Dataset types injected by DAG from dependencies
+        """
         # Dynamic import of model module
         module_name = f"model_mod_{pkg_dir.name}"
         spec = importlib.util.spec_from_file_location(module_name, model_py)
@@ -368,7 +459,7 @@ def run_model(
             overrides=overrides or {},
         )
 
-        # Execute model
+        # Execute model with auto-injected types
         output_df = model.run(
             available_types=available_types,
             partitions_by_input=partitions or {},
@@ -382,5 +473,10 @@ def run_model(
             "rows": int(len(output_df)),
             "layer": "processed",
         }
+
+    # Attach metadata for DAG validation and auto-injection
+    task_callable.output_types = [output_type]
+    task_callable.input_requirements = input_requirements
+    task_callable._model_package_path = package_path  # For error messages
 
     return task_callable

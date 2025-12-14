@@ -65,15 +65,21 @@ class Subdomain(Enum):
     RISK_MODELS = "risk-models"
     MODELS = "models"
     EVENT_STUDIES = "event-studies"
+    EXPECTED_RETURNS = "expected-returns"
+    FACTOR_RETURNS = "factor-returns"
+    FACTOR_EXPOSURES = "factor-exposures"
 
     # Portfolio
     POSITIONS = "positions"
     TRANSACTIONS = "transactions"
     PNL = "pnl"
+    PORTFOLIO_WEIGHTS = "portfolio-weights"
 
     # Data Products
     RESEARCH_EXPORTS = "research-exports"
     DASHBOARD_FEEDS = "dashboard-feeds"
+
+
 class Region(Enum):
     """Geographic/market regions (used in DatasetType for contract identity)"""
 

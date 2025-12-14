@@ -98,9 +98,7 @@ class HistoricMembersLoader(BaseLoader):
         # Initialize ticker mapper if enabled
         ticker_mapper = TickerMapper() if use_mapper else None
 
-        # Load membership intervals from curated data via direct file access
-        from pathlib import Path
-
+        # Load membership intervals from curated data via typed loader (contract-based)
         membership_type = DatasetType(
             domain=Domain.INSTRUMENT_REFERENCE,
             asset_class=None,
@@ -109,24 +107,15 @@ class HistoricMembersLoader(BaseLoader):
             frequency=None,
         )
 
-        # Construct partition path: data/curated/instrument-reference/index-constituents/schema_v1/universe={universe}/mode=intervals
-        base_path = Path("data/curated/instrument-reference/index-constituents/schema_v1")
-        partition_path = base_path / f"universe={universe}" / "mode=intervals"
-
-        if not partition_path.exists():
-            print(
-                f"⚠️  No membership data found for universe '{universe}' at {partition_path}"
+        # Use typed loading instead of direct file access
+        try:
+            df = self.curated_loader.load(
+                dataset_type=membership_type,
+                partitions={"universe": universe, "mode": "intervals"},
             )
+        except FileNotFoundError as e:
+            print(f"⚠️  {e}")
             return []
-
-        # Read all parquet files in partition
-        files = list(partition_path.glob("*.parquet"))
-        if not files:
-            print(f"⚠️  No parquet files found for universe '{universe}'")
-            return []
-
-        dfs = [pd.read_parquet(f) for f in files]
-        df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
         # Deduplicate in case multiple builder runs created duplicate files
         if not df.empty:

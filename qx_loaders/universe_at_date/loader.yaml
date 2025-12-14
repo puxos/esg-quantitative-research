@@ -3,6 +3,7 @@ loader:
   version: 1.0.0
   description: "Select symbols that were in universe on a specific date"
 
+# Curated datasets required (resolved via DatasetType contracts)
 inputs:
   - name: membership_data
     required: true
@@ -11,6 +12,7 @@ inputs:
       subdomain: index-constituents
     description: "Membership interval data"
 
+# Configuration parameters (not datasets)
 parameters:
   date:
     type: str
@@ -24,6 +26,12 @@ parameters:
     description: "Universe identifier"
     allowed: ["sp500", "russell1000", "nasdaq100"]
 
+# Optional: Declare dependencies on other task outputs (not curated datasets)
+# runtime_dependencies:
+#   - task_id: "SomeOtherTask"
+#     description: "Optional: describe why this dependency exists"
+
+# Output specification
 output:
   type: list
   item_type: str

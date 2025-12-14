@@ -205,17 +205,23 @@ class DataBuilderBase(abc.ABC):
     @abc.abstractmethod
     def transform_to_curated(self, raw_df: pd.DataFrame, **kwargs) -> pd.DataFrame: ...
 
-    def build(self, partitions: dict, **kwargs) -> Union[str, List[str]]:
+    def build(
+        self, partitions: dict, available_types: Optional[List] = None, **kwargs
+    ) -> Union[str, List[str]]:
         """
         Execute the build pipeline: fetch → transform → write.
 
         Args:
             partitions: Partition values (e.g., {"exchange": "US", "frequency": "daily"})
+            available_types: Optional list of available DatasetTypes for builders
+                with curated data inputs (auto-injected by DAG)
             **kwargs: Additional arguments passed to fetch_raw and transform_to_curated
 
         Returns:
             Path(s) to written curated data
         """
+        # Store available_types for use in fetch_raw/transform if needed
+        self.available_types = available_types
         # Resolve contract with actual partition values
         if self.contract is None:
             # Some fields may be null in template but provided in partitions
@@ -248,11 +254,12 @@ class DataBuilderBase(abc.ABC):
             if self.contract is None:
                 raise ValueError(f"No contract found for output type: {actual_dt}")
 
-        # Merge parameters into kwargs for backward compatibility
-        merged_kwargs = {**self.params, **kwargs, "partitions": partitions}
+        # Pass parameters and partitions to transform/fetch
+        fetch_kwargs = {**self.params, **kwargs}
+        transform_kwargs = {**self.params, **kwargs, "partitions": partitions}
 
         curated = self.transform_to_curated(
-            self.fetch_raw(**merged_kwargs), **merged_kwargs
+            self.fetch_raw(**fetch_kwargs), **transform_kwargs
         )
         curated = curated.copy()
         curated["schema_version"] = self.contract.schema_version

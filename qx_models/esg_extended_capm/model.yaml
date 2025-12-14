@@ -34,8 +34,8 @@ io:
       type:
         domain: derived-metrics
         asset_class: equity
-        subdomain: models
-        subtype: market-esg-betas
+        subdomain: factor-exposures
+        subtype: null
         region: null
         frequency: monthly
       description: |
@@ -57,6 +57,7 @@ io:
         domain: market-data
         asset_class: equity
         subdomain: bars
+        subtype: null
         region: US
         frequency: monthly
       description: |
@@ -70,6 +71,7 @@ io:
         domain: reference-rates
         asset_class: fixed-income
         subdomain: yield-curves
+        subtype: null
         region: US
         frequency: monthly
       description: |

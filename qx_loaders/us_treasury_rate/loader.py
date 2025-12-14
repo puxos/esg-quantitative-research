@@ -116,32 +116,29 @@ class USTreasuryRateLoader(BaseLoader):
         freq_enum = Frequency(frequency)
         freq_str = frequency
 
-        # Load data from curated storage
+        # Load data from curated storage via typed loader (contract-based)
         # Treasury data is partitioned by rate_type and frequency
-        # Path: data/curated/reference-rates/yield-curves/region=US/treasury_rate/schema_v1/rate_type={rate_type}/frequency={frequency}/
-        base_path = Path("data/curated/reference-rates/yield-curves/region=US/treasury_rate/schema_v1")
+        treasury_type = DatasetType(
+            domain=Domain.REFERENCE_RATES,
+            asset_class=AssetClass.FIXED_INCOME,
+            subdomain=Subdomain.YIELD_CURVES,
+            region=Region.US,
+            frequency=freq_enum,
+        )
 
         all_dfs = []
         for rate_type in rate_types:
-            rate_type_path = (
-                base_path / f"rate_type={rate_type}" / f"frequency={frequency}"
-            )
-
-            if not rate_type_path.exists():
-                print(f"   ⚠️  No data found for {rate_type} at {rate_type_path}")
-                continue
-
-            # Load all parquet files for this rate_type
-            parquet_files = list(rate_type_path.glob("*.parquet"))
-            if not parquet_files:
-                print(f"   ⚠️  No parquet files found for {rate_type}")
-                continue
-
-            for pq_file in parquet_files:
-                df_rate = pd.read_parquet(pq_file)
+            try:
+                # Use typed loading with rate_type partition
+                df_rate = self.curated_loader.load(
+                    dataset_type=treasury_type,
+                    partitions={"rate_type": rate_type, "frequency": frequency},
+                )
                 all_dfs.append(df_rate)
-
-            print(f"   ✅ Loaded {rate_type}: {len(parquet_files)} file(s)")
+                print(f"   ✅ Loaded {rate_type}: {len(df_rate)} rows")
+            except FileNotFoundError:
+                print(f"   ⚠️  No data found for {rate_type}")
+                continue
 
         if not all_dfs:
             raise ValueError(

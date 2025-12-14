@@ -114,12 +114,8 @@ class ESGPanelLoader(BaseLoader):
             print("⚠️  Empty symbol list, returning empty DataFrame")
             return pd.DataFrame()
 
-        # Load ESG scores from curated data via direct file access
+        # Load ESG scores from curated data via typed loader (contract-based)
         # Note: ESG data is now YEARLY (one record per company per ESG publication year)
-        from pathlib import Path
-
-        import pyarrow.parquet as pq
-
         esg_type = DatasetType(
             domain=Domain.ESG,
             asset_class=AssetClass.EQUITY,
@@ -132,34 +128,26 @@ class ESGPanelLoader(BaseLoader):
         # For period 2014-2024, load esg_years 2013-2023
         esg_years = range(start_date.year - 1, end_date.year)
 
-        # Construct base path: data/curated/esg/esg_scores/schema_v1
-        base_path = Path("data/curated/esg/esg_scores/schema_v1")
+        # Use PyArrow filter pushdown for ticker filtering
+        arrow_filters = [("ticker", "in", symbols)]
 
         dfs = []
         for esg_year in esg_years:
-            # Partition path: exchange={exchange}/esg_year={esg_year}
-            partition_path = base_path / f"exchange={exchange}" / f"esg_year={esg_year}"
-
-            if not partition_path.exists():
+            try:
+                # Use typed loading with filters
+                df_year = self.curated_loader.load(
+                    dataset_type=esg_type,
+                    partitions={"exchange": exchange, "esg_year": str(esg_year)},
+                    filters=arrow_filters,
+                )
+                if not df_year.empty:
+                    dfs.append(df_year)
+            except FileNotFoundError:
+                # No data for this year, skip
                 continue
-
-            # Read parquet files with PyArrow filter for symbols
-            files = list(partition_path.glob("*.parquet"))
-            if not files:
+            except Exception as e:
+                print(f"⚠️  Error loading ESG data for year {esg_year}: {e}")
                 continue
-
-            # Use PyArrow filter pushdown for ticker filtering
-            arrow_filters = [("ticker", "in", symbols)]
-
-            for pq_file in files:
-                try:
-                    table = pq.read_table(str(pq_file), filters=arrow_filters)
-                    df_year = table.to_pandas()
-                    if not df_year.empty:
-                        dfs.append(df_year)
-                except Exception as e:
-                    print(f"⚠️  Error reading {pq_file}: {e}")
-                    continue
 
         # Combine all ESG years
         if not dfs:

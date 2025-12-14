@@ -4,7 +4,7 @@
 dataset:
   domain: derived-metrics
   asset_class: equity
-  subdomain: models
+  subdomain: factor-exposures
   subtype: market-esg-regression
   region: null
   frequency: null

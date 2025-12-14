@@ -74,8 +74,8 @@ io:
     type:
       domain: derived-metrics
       asset_class: equity
-      subdomain: models
-      subtype: market-esg-betas
+      subdomain: factor-exposures
+      subtype: market-esg-regression
       region: null
       frequency: monthly
     description: |

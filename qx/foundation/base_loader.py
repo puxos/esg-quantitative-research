@@ -14,11 +14,12 @@ Loaders bridge the gap between "curated data exists" and "use it as parameters".
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 
 from qx.common.contracts import DatasetRegistry
+from qx.foundation.typed_curated_loader import TypedCuratedLoader
 from qx.storage.backend_local import LocalParquetBackend
 from qx.storage.pathing import PathResolver
 
@@ -147,6 +148,14 @@ class BaseLoader:
         self.backend = backend
         self.resolver = resolver
 
+        # Initialize typed curated loader for type-safe data access
+        # This replaces direct file path access with contract-based loading
+        self.curated_loader = TypedCuratedLoader(
+            backend=self.backend,
+            registry=self.registry,
+            resolver=self.resolver,
+        )
+
         # Validate parameters (optional, can be overridden)
         self._validate_parameters()
 
@@ -190,11 +199,15 @@ class BaseLoader:
                         f"Parameter '{param_name}' expected list, got {type(value).__name__}"
                     )
 
-    def load(self) -> Any:
+    def load(self, available_types: Optional[List] = None) -> Any:
         """
         Execute loader logic and return output.
 
         This is the main entry point that calls load_impl().
+
+        Args:
+            available_types: Optional list of available DatasetTypes for loaders
+                with curated data inputs (auto-injected by DAG)
 
         Returns:
             Python object (List, Dict, DataFrame, etc.)
@@ -202,6 +215,8 @@ class BaseLoader:
         Raises:
             NotImplementedError: Must be implemented by subclass
         """
+        # Store available_types for use in load_impl if needed
+        self.available_types = available_types
         return self.load_impl()
 
     def load_impl(self) -> Any:
@@ -209,20 +224,31 @@ class BaseLoader:
         Implement loader logic here.
 
         This method should:
-        1. Read curated data using self.curated_loader
+        1. Read curated data using self.curated_loader (type-safe, contract-based)
         2. Apply filters/transformations using self.params
         3. Return lightweight output (List, Dict, DataFrame)
+
+        IMPORTANT: Use self.curated_loader.load() instead of direct file path access.
+        This ensures type safety and consistency with the contract system.
 
         Returns:
             Python object (List, Dict, DataFrame, etc.)
 
         Example:
             def load_impl(self):
-                # Read curated membership data
+                # ✅ GOOD: Type-safe loading via contract
                 df = self.curated_loader.load(
-                    dt=DatasetType(domain=Domain.MEMBERSHIP, subdomain="sp500_membership_intervals"),
+                    dataset_type=DatasetType(
+                        domain=Domain.INSTRUMENT_REFERENCE,
+                        subdomain=Subdomain.INDEX_CONSTITUENTS
+                    ),
                     partitions={"universe": self.params["universe"], "mode": "intervals"}
                 )
+
+                # ❌ BAD: Direct file path access (avoid this)
+                # base_path = Path("data/curated/membership/intervals/schema_v1")
+                # partition_path = base_path / f"universe={universe}"
+                # files = list(partition_path.glob("*.parquet"))
 
                 # Filter continuous members
                 start_date = pd.Timestamp(self.params["start_date"])

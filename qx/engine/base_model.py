@@ -42,13 +42,20 @@ class BaseModel(abc.ABC):
         self,
         package_dir: str,
         registry: DatasetRegistry,
-        loader,
+        backend,  # LocalParquetBackend
+        resolver,  # PathResolver
         writer: ProcessedWriterBase,
         overrides: Optional[Dict] = None,
     ):
         with open(os.path.join(package_dir, "model.yaml"), "r") as f:
             cfg = yaml.safe_load(f)
-        self.registry, self.loader, self.writer = registry, loader, writer
+
+        # Create typed curated loader from backend + registry + resolver
+        from qx.foundation.typed_curated_loader import TypedCuratedLoader
+
+        self.loader = TypedCuratedLoader(backend, registry, resolver)
+
+        self.registry, self.writer = registry, writer
         self.info = cfg["model"]
         self.inputs_cfg = cfg["io"]["inputs"]
         self.output_dt = dt_from_cfg(cfg["io"]["output"]["type"])
@@ -83,13 +90,20 @@ class BaseModel(abc.ABC):
                 dt
                 for dt in available_types
                 if (
-                    dt.domain == pattern.domain
-                    and dt.subdomain == pattern.subdomain
+                    # Check domain (None = match any)
+                    (pattern.domain is None or dt.domain == pattern.domain)
+                    # Check subdomain (None = match any)
+                    and (pattern.subdomain is None or dt.subdomain == pattern.subdomain)
+                    # Check asset_class (None = match any)
                     and (
                         pattern.asset_class is None
                         or dt.asset_class == pattern.asset_class
                     )
+                    # Check subtype (None = match any)
+                    and (pattern.subtype is None or dt.subtype == pattern.subtype)
+                    # Check region (None = match any)
                     and (pattern.region is None or dt.region == pattern.region)
+                    # Check frequency (None = match any)
                     and (pattern.frequency is None or dt.frequency == pattern.frequency)
                 )
             ]

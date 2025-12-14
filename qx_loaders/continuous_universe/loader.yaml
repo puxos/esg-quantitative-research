@@ -3,6 +3,7 @@ loader:
   version: 1.0.0
   description: "Select symbols that were continuously in a universe during a period"
 
+# Curated datasets required (resolved via DatasetType contracts)
 inputs:
   - name: membership_data
     required: true
@@ -12,6 +13,7 @@ inputs:
       subdomain: index-constituents
     description: "Membership interval data"
 
+# Configuration parameters (not datasets)
 parameters:
   start_date:
     type: str

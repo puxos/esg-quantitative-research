@@ -15,7 +15,7 @@ io:
     type:
       domain: esg
       asset_class: equity
-      subdomain: esg_scores
+      subdomain: esg-scores
       region: null
       frequency: yearly  # ESG scores are annual (one record per company per year)
 

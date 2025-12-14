@@ -4,8 +4,8 @@
 dataset:
   domain: derived-metrics
   asset_class: equity
-  subdomain: models
-  subtype: factors
+  subdomain: factor-returns
+  subtype: esg-factors
   region: null
   frequency: null
 

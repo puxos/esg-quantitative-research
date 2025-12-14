@@ -1,0 +1,112 @@
+# CAPM Expected Returns Model - Output Schema
+# Expected returns from standard CAPM (market factor only)
+
+dataset:
+  domain: derived-metrics
+  asset_class: equity
+  subdomain: expected-returns
+  subtype: capm
+  region: null
+  frequency: null
+
+contract:
+  schema_version: schema_v1
+
+  columns:
+    - name: symbol
+      type: string
+      description: Stock ticker symbol
+      required: true
+      filterable: true
+      filter_type: in
+
+    - name: date
+      type: date
+      description: Forecast date (monthly)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: beta_market
+      type: float
+      description: Market beta (from regression)
+      required: true
+      filterable: false
+
+    - name: rf_rate
+      type: float
+      description: Risk-free rate (monthly)
+      required: true
+      filterable: false
+
+    - name: market_premium
+      type: float
+      description: Market risk premium (monthly)
+      required: true
+      filterable: false
+
+    - name: ER_monthly
+      type: float
+      description: Expected return (monthly)
+      required: true
+      filterable: true
+      filter_type: range
+
+    - name: ER_annual
+      type: float
+      description: Expected return (annualized)
+      required: true
+      filterable: true
+      filter_type: range
+
+    # Metadata columns (auto-added by BaseModel)
+    - name: model
+      type: string
+      description: Model ID (auto-added by BaseModel)
+      required: true
+      filterable: true
+      filter_type: exact
+
+    - name: model_version
+      type: string
+      description: Model version (auto-added by BaseModel)
+      required: true
+      filterable: true
+      filter_type: exact
+
+    - name: featureset_id
+      type: string
+      description: Input featureset ID (auto-added by BaseModel)
+      required: true
+      filterable: true
+      filter_type: exact
+
+    - name: run_id
+      type: string
+      description: Run identifier (auto-added by BaseModel)
+      required: true
+      filterable: true
+      filter_type: exact
+
+    - name: run_ts
+      type: datetime
+      description: Run timestamp (auto-added by BaseModel)
+      required: true
+      filterable: true
+      filter_type: range
+
+  partition_keys:
+    - date
+
+  filters:
+    date:
+      type: date
+      description: Filter by forecast date
+
+  path_template: "data/processed/{domain}/{asset_class}/{subdomain}/{subtype}/date={date}/part-{run_id}.parquet"
+
+metadata:
+  source: CAPM Model
+  description: Expected returns from standard Capital Asset Pricing Model
+  update_frequency: on-demand
+  data_quality: model-generated
