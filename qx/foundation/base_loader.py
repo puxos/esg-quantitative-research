@@ -77,9 +77,7 @@ class BaseLoader:
     def __init__(
         self,
         package_dir: str,
-        registry: DatasetRegistry,
-        backend: LocalParquetBackend,
-        resolver: PathResolver,
+        loader: TypedCuratedLoader,
         overrides: Optional[Dict] = None,
     ):
         """
@@ -87,14 +85,13 @@ class BaseLoader:
 
         Args:
             package_dir: Path to loader package (e.g., "qx_loaders/continuous_universe")
-            registry: Dataset registry for resolving contracts
-            backend: Storage backend for reading curated data
-            resolver: Path resolver for locating data
+            loader: High-level typed curated data loader (contains registry, backend, resolver)
             overrides: Parameter overrides (e.g., {"start_date": "2014-01-01"})
         """
         self.package_dir = Path(package_dir)
-        self.registry = registry
-        self.backend = backend
+        self.loader = loader
+        self.registry = loader.registry
+        self.backend = loader.backend
 
         # Apply mode override if specified in loader.yaml
         # This allows packages to force a specific mode (e.g., reference data always uses prod)
@@ -107,18 +104,18 @@ class BaseLoader:
 
         self.info = self.config.get("loader", {})
         package_mode = self.info.get("mode")
+        resolver_source = loader.resolver
         if (
             package_mode
-            and resolver is not None
-            and hasattr(resolver, "mode")
-            and resolver.mode != package_mode
+            and hasattr(resolver_source, "mode")
+            and resolver_source.mode != package_mode
         ):
             # Create new resolver with overridden mode
             from qx.storage.pathing import PathResolver
 
             self.resolver = PathResolver(mode=package_mode)
         else:
-            self.resolver = resolver
+            self.resolver = resolver_source
 
         # Load loader.yaml configuration
         self.loader_id = self.info.get("id", "unknown")
@@ -142,19 +139,6 @@ class BaseLoader:
                 )
             else:
                 self.params[param_name] = None
-
-        # Store infrastructure for loaders that need direct file access
-        self.registry = registry
-        self.backend = backend
-        self.resolver = resolver
-
-        # Initialize typed curated loader for type-safe data access
-        # This replaces direct file path access with contract-based loading
-        self.curated_loader = TypedCuratedLoader(
-            backend=self.backend,
-            registry=self.registry,
-            resolver=self.resolver,
-        )
 
         # Validate parameters (optional, can be overridden)
         self._validate_parameters()

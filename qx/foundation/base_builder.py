@@ -21,6 +21,7 @@ from qx.common.types import (
     Region,
     Subdomain,
 )
+from qx.storage.curated_writer import CuratedWriter
 from qx.storage.pathing import PathResolver
 from qx.storage.table_format import TableFormatAdapter
 
@@ -82,9 +83,7 @@ class DataBuilderBase(abc.ABC):
     def __init__(
         self,
         package_dir: str,
-        registry: DatasetRegistry,
-        adapter: TableFormatAdapter,
-        resolver: PathResolver,
+        writer: CuratedWriter,
         overrides: Optional[Dict] = None,
     ):
         """
@@ -92,9 +91,7 @@ class DataBuilderBase(abc.ABC):
 
         Args:
             package_dir: Path to builder package containing builder.yaml
-            registry: Dataset registry for resolving contracts
-            adapter: Table format adapter for writing curated data
-            resolver: Path resolver for output paths
+            writer: High-level curated data writer (contains registry, adapter, resolver)
             overrides: Parameter overrides (e.g., {"symbols": ["AAPL"], "start_date": "2020-01-01"})
         """
         # Load builder.yaml from package_dir
@@ -114,9 +111,10 @@ class DataBuilderBase(abc.ABC):
         # Resolve relative paths in parameters (relative to package directory)
         self._resolve_relative_paths()
 
-        # Store components
-        self.registry = registry
-        self.adapter = adapter
+        # Store high-level writer and extract components
+        self.writer = writer
+        self.registry = writer.registry
+        self.adapter = writer.adapter
 
         # Set write mode if specified in parameters
         write_mode = self.params.get("write_mode", "append")
@@ -129,18 +127,16 @@ class DataBuilderBase(abc.ABC):
         # Apply mode override if specified in builder.yaml
         # This allows packages to force a specific mode (e.g., reference data always uses prod)
         package_mode = self.info.get("mode")
+        resolver_source = writer.resolver
         if (
             package_mode
-            and resolver is not None
-            and hasattr(resolver, "mode")
-            and resolver.mode != package_mode
+            and hasattr(resolver_source, "mode")
+            and resolver_source.mode != package_mode
         ):
             # Create new resolver with overridden mode
-            from qx.storage.pathing import PathResolver
-
             self.resolver = PathResolver(mode=package_mode)
         else:
-            self.resolver = resolver
+            self.resolver = resolver_source
 
         # Contract will be resolved in build() with actual partition values
         self.contract = None

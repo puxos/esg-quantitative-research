@@ -160,12 +160,15 @@ def run_loader(
         if loader_cls is None:
             raise RuntimeError(f"No loader class found in {package_path}/loader.py")
 
-        # Instantiate loader with YAML config
+        # Create high-level TypedCuratedLoader abstraction
+        from qx.foundation.typed_curated_loader import TypedCuratedLoader
+
+        typed_loader = TypedCuratedLoader(backend, registry, resolver)
+
+        # Instantiate loader with high-level abstraction
         loader = loader_cls(
             package_dir=str(pkg_dir),
-            registry=registry,
-            backend=backend,
-            resolver=resolver,
+            loader=typed_loader,
             overrides=overrides or {},
         )
 
@@ -305,12 +308,20 @@ def run_builder(
         if builder_cls is None:
             raise RuntimeError(f"No builder class found in {package_path}/builder.py")
 
-        # Instantiate builder with YAML config
-        builder = builder_cls(
-            package_dir=str(pkg_dir),
-            registry=registry,
+        # Create high-level CuratedWriter abstraction
+        from qx.storage.curated_writer import CuratedWriter
+
+        curated_writer = CuratedWriter(
+            backend=adapter.backend,
             adapter=adapter,
             resolver=resolver,
+            registry=registry,
+        )
+
+        # Instantiate builder with high-level abstraction
+        builder = builder_cls(
+            package_dir=str(pkg_dir),
+            writer=curated_writer,
             overrides=overrides or {},
         )
 
@@ -449,12 +460,15 @@ def run_model(
         if model_cls is None:
             raise RuntimeError(f"No model class found in {package_path}/model.py")
 
-        # Instantiate model with YAML config
+        # Create high-level TypedCuratedLoader abstraction
+        from qx.foundation.typed_curated_loader import TypedCuratedLoader
+
+        typed_loader = TypedCuratedLoader(backend, registry, resolver)
+
+        # Instantiate model with high-level abstractions
         model = model_cls(
             package_dir=str(pkg_dir),
-            registry=registry,
-            backend=backend,
-            resolver=resolver,
+            loader=typed_loader,
             writer=writer,
             overrides=overrides or {},
         )

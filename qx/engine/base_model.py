@@ -41,21 +41,26 @@ class BaseModel(abc.ABC):
     def __init__(
         self,
         package_dir: str,
-        registry: DatasetRegistry,
-        backend,  # LocalParquetBackend
-        resolver,  # PathResolver
+        loader: "TypedCuratedLoader",
         writer: ProcessedWriterBase,
         overrides: Optional[Dict] = None,
     ):
+        """
+        Initialize model from package directory.
+        
+        Args:
+            package_dir: Path to model package containing model.yaml
+            loader: High-level typed curated data loader (contains registry, backend, resolver)
+            writer: High-level processed data writer
+            overrides: Parameter overrides
+        """
         with open(os.path.join(package_dir, "model.yaml"), "r") as f:
             cfg = yaml.safe_load(f)
 
-        # Create typed curated loader from backend + registry + resolver
-        from qx.foundation.typed_curated_loader import TypedCuratedLoader
-
-        self.loader = TypedCuratedLoader(backend, registry, resolver)
-
-        self.registry, self.writer = registry, writer
+        # Store high-level abstractions
+        self.loader = loader
+        self.writer = writer
+        self.registry = loader.registry
         self.info = cfg["model"]
         self.inputs_cfg = cfg["io"]["inputs"]
         self.output_dt = dt_from_cfg(cfg["io"]["output"]["type"])

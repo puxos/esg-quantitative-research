@@ -26,32 +26,17 @@ class SP500MembershipBuilder(DataBuilderBase):
     YAML-based initialization only - uses builder.yaml configuration.
     """
 
-    def __init__(
-        self,
-        package_dir: str,
-        registry: DatasetRegistry,
-        adapter: TableFormatAdapter,
-        resolver: PathResolver,
-        overrides: Optional[dict] = None,
-    ):
+    def __init__(self, package_dir: str, writer, overrides: Optional[dict] = None):
         """
         Initialize S&P 500 membership builder from YAML configuration.
 
         Args:
             package_dir: Path to builder package containing builder.yaml
-            registry: Dataset registry for resolving contracts
-            adapter: Table format adapter for writing curated data
-            resolver: Path resolver for output paths
+            writer: High-level curated data writer
             overrides: Parameter overrides
         """
         # Load YAML configuration
-        super().__init__(
-            package_dir=package_dir,
-            registry=registry,
-            adapter=adapter,
-            resolver=resolver,
-            overrides=overrides,
-        )
+        super().__init__(package_dir=package_dir, writer=writer, overrides=overrides)
 
         # Get parameters from YAML config (loaded by parent)
         self.raw_data_root = Path(self.params.get("raw_data_root", "./data/raw"))
