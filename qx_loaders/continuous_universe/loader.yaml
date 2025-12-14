@@ -38,3 +38,10 @@ output:
   item_type: str
   description: "List of ticker symbols that were continuously in the universe"
   example: ["AAPL", "MSFT", "GOOGL", ...]
+
+  # Validation rules
+  validation:
+    allow_empty: false  # Must find at least one continuous member
+    min_length: 1
+    max_length: 5000
+    item_pattern: "^[A-Z0-9.\\-]+$"

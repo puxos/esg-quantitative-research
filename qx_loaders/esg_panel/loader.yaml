@@ -103,6 +103,12 @@ output:
     If continuous=False:
       Includes all available ESG data for symbols, even if incomplete.
 
+  # Validation rules
+  validation:
+    allow_empty: false  # Must have data for specified symbols
+    required_columns: ["ticker", "esg_year", "year", "esg_score"]
+    min_rows: 1
+
   example: |
     DataFrame with ~500 rows for 5 symbols over 10 years (monthly)
 

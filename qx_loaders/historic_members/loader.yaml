@@ -80,7 +80,7 @@ parameters:
 # Note: This loader doesn't need runtime_dependencies because it reads
 # from curated data (declared in `inputs`), not from task outputs.
 
-# Output specification
+# Output specification (with validation rules)
 output:
   type: list
   item_type: str
@@ -91,3 +91,10 @@ output:
     - Removed members (delisted, acquired, merged)
     - Stocks that joined and left during the period
   example: ["AAPL", "MSFT", "GOOGL", "FOX", "TWX", ...]
+
+  # Validation rules (enforced at runtime)
+  validation:
+    allow_empty: false  # Must have at least one symbol
+    min_length: 1
+    max_length: 5000  # Sanity check: universe shouldn't exceed 5000 symbols
+    item_pattern: "^[A-Z0-9.\\-]+$"  # Valid ticker format

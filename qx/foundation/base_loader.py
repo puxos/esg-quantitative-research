@@ -199,11 +199,153 @@ class BaseLoader:
                         f"Parameter '{param_name}' expected list, got {type(value).__name__}"
                     )
 
+    def _validate_output(self, output: Any) -> None:
+        """
+        Validate output against declared contract in loader.yaml.
+
+        Raises:
+            ValueError: If output doesn't match contract
+            TypeError: If output type is incorrect
+        """
+        output_spec = self.config.get("output", {})
+        if not output_spec:
+            return  # No validation if no output spec
+
+        expected_type = output_spec.get("type")
+        validation_rules = output_spec.get("validation", {})
+
+        # Type validation
+        if expected_type == "list":
+            if not isinstance(output, list):
+                raise TypeError(
+                    f"Loader '{self.loader_id}' output contract expects list, "
+                    f"got {type(output).__name__}"
+                )
+
+            # List-specific validations
+            if not validation_rules.get("allow_empty", True) and len(output) == 0:
+                raise ValueError(
+                    f"Loader '{self.loader_id}' returned empty list, "
+                    f"but allow_empty=false in contract"
+                )
+
+            if (
+                "min_length" in validation_rules
+                and len(output) < validation_rules["min_length"]
+            ):
+                raise ValueError(
+                    f"Loader '{self.loader_id}' returned {len(output)} items, "
+                    f"but contract requires min_length={validation_rules['min_length']}"
+                )
+
+            if (
+                "max_length" in validation_rules
+                and len(output) > validation_rules["max_length"]
+            ):
+                raise ValueError(
+                    f"Loader '{self.loader_id}' returned {len(output)} items, "
+                    f"exceeds max_length={validation_rules['max_length']}"
+                )
+
+            # Item type validation
+            item_type = output_spec.get("item_type")
+            if item_type and output:
+                type_map = {"str": str, "int": int, "float": float, "bool": bool}
+                expected_item_type = type_map.get(item_type)
+                if expected_item_type:
+                    for i, item in enumerate(output[:10]):  # Check first 10 items
+                        if not isinstance(item, expected_item_type):
+                            raise TypeError(
+                                f"Loader '{self.loader_id}' list item at index {i} "
+                                f"expected {item_type}, got {type(item).__name__}"
+                            )
+
+            # Item pattern validation (regex)
+            if "item_pattern" in validation_rules and output:
+                import re
+
+                pattern = re.compile(validation_rules["item_pattern"])
+                for i, item in enumerate(output[:100]):  # Check first 100 items
+                    if isinstance(item, str) and not pattern.match(item):
+                        raise ValueError(
+                            f"Loader '{self.loader_id}' list item at index {i} '{item}' "
+                            f"doesn't match pattern: {validation_rules['item_pattern']}"
+                        )
+
+        elif expected_type == "dataframe":
+            import pandas as pd
+
+            if not isinstance(output, pd.DataFrame):
+                raise TypeError(
+                    f"Loader '{self.loader_id}' output contract expects DataFrame, "
+                    f"got {type(output).__name__}"
+                )
+
+            # DataFrame-specific validations
+            if not validation_rules.get("allow_empty", True) and len(output) == 0:
+                raise ValueError(
+                    f"Loader '{self.loader_id}' returned empty DataFrame, "
+                    f"but allow_empty=false in contract"
+                )
+
+            # Required columns validation
+            if "required_columns" in validation_rules:
+                missing = set(validation_rules["required_columns"]) - set(
+                    output.columns
+                )
+                if missing:
+                    raise ValueError(
+                        f"Loader '{self.loader_id}' DataFrame missing required columns: {missing}"
+                    )
+
+            # Row count validations
+            if (
+                "min_rows" in validation_rules
+                and len(output) < validation_rules["min_rows"]
+            ):
+                raise ValueError(
+                    f"Loader '{self.loader_id}' returned {len(output)} rows, "
+                    f"but contract requires min_rows={validation_rules['min_rows']}"
+                )
+
+            if (
+                "max_rows" in validation_rules
+                and len(output) > validation_rules["max_rows"]
+            ):
+                raise ValueError(
+                    f"Loader '{self.loader_id}' returned {len(output)} rows, "
+                    f"exceeds max_rows={validation_rules['max_rows']}"
+                )
+
+        elif expected_type == "dict":
+            if not isinstance(output, dict):
+                raise TypeError(
+                    f"Loader '{self.loader_id}' output contract expects dict, "
+                    f"got {type(output).__name__}"
+                )
+
+            # Dict-specific validations
+            if "required_keys" in validation_rules:
+                missing = set(validation_rules["required_keys"]) - set(output.keys())
+                if missing:
+                    raise ValueError(
+                        f"Loader '{self.loader_id}' dict missing required keys: {missing}"
+                    )
+
+        elif expected_type == "series":
+            import pandas as pd
+
+            if not isinstance(output, pd.Series):
+                raise TypeError(
+                    f"Loader '{self.loader_id}' output contract expects Series, "
+                    f"got {type(output).__name__}"
+                )
+
     def load(self, available_types: Optional[List] = None) -> Any:
         """
         Execute loader logic and return output.
 
-        This is the main entry point that calls load_impl().
+        This is the main entry point that calls load_impl() and validates output.
 
         Args:
             available_types: Optional list of available DatasetTypes for loaders
@@ -214,10 +356,19 @@ class BaseLoader:
 
         Raises:
             NotImplementedError: Must be implemented by subclass
+            ValueError: If output doesn't match declared contract
+            TypeError: If output type is incorrect
         """
         # Store available_types for use in load_impl if needed
         self.available_types = available_types
-        return self.load_impl()
+
+        # Execute loader implementation
+        output = self.load_impl()
+
+        # Validate output against contract
+        self._validate_output(output)
+
+        return output
 
     def load_impl(self) -> Any:
         """

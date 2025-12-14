@@ -31,9 +31,15 @@ parameters:
 #   - task_id: "SomeOtherTask"
 #     description: "Optional: describe why this dependency exists"
 
-# Output specification
+# Output specification (with validation rules)
 output:
   type: list
   item_type: str
   description: "List of ticker symbols in the universe on the specified date"
   example: ["AAPL", "MSFT", "GOOGL", ...]
+
+  # Validation rules
+  validation:
+    allow_empty: true  # Date might be outside available data range
+    max_length: 5000
+    item_pattern: "^[A-Z0-9.\\-]+$"

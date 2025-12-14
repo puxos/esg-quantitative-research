@@ -71,6 +71,12 @@ output:
     - frequency
     - source
 
+  # Validation rules
+  validation:
+    allow_empty: false  # Must have rate data for specified period
+    required_columns: ["date", "rate_type", "rate"]
+    min_rows: 1
+
 examples:
   - description: "Load 3-month T-bill rates for CAPM"
     usage: |
