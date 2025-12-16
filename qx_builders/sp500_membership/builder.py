@@ -19,9 +19,17 @@ from qx.storage.table_format import TableFormatAdapter
 
 class SP500MembershipBuilder(DataBuilderBase):
     """
-    Builder for S&P 500 historical membership data.
+    DUAL-MODE BUILDER: S&P 500 historical membership data.
 
-    Transforms raw CSV (date, tickers) into curated daily membership data.
+    Mode 1 - SOURCE (daily):
+        External Source: Local CSV file (S&P 500 Historical Components)
+        Transform: CSV (date, tickers) → Daily membership records
+        Authentication: None (local file)
+
+    Mode 2 - TRANSFORM (intervals):
+        Input: Curated daily membership data (from mode 1)
+        Transform: Daily records → Continuous membership intervals
+        Dependencies: Must run daily mode first
 
     YAML-based initialization only - uses builder.yaml configuration.
     """

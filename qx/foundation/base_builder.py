@@ -46,7 +46,9 @@ def dt_from_cfg(d: Dict) -> DatasetType:
         subdomain = (
             Subdomain(validated["subdomain"]) if validated.get("subdomain") else None
         )
-        subtype = validated.get("subtype")  # Custom string, no enum conversion
+        subtype = (
+            str(validated["subtype"]) if validated.get("subtype") else None
+        )  # Custom string, no enum conversion
         region = Region(validated["region"]) if validated.get("region") else None
         frequency = (
             Frequency(validated["frequency"]) if validated.get("frequency") else None
@@ -78,6 +80,39 @@ class DataBuilderBase(abc.ABC):
 
     YAML-based initialization only - reads configuration from builder.yaml.
     Use with run_builder() factory for DAG orchestration.
+
+    Builder Types:
+    --------------
+    Builders fall into two categories based on their data source:
+
+    1. SOURCE BUILDERS:
+       - Fetch data from EXTERNAL sources (APIs, files, databases)
+       - No dependencies on other builders
+       - Require authentication (API keys, credentials)
+       - Handle network errors, rate limiting
+       - Examples: USTreasuryRateBuilder (FRED API), TiingoOHLCVBuilder (Tiingo API)
+
+    2. TRANSFORM BUILDERS:
+       - Transform EXISTING curated data into new curated datasets
+       - Depend on other builders (must run after dependencies)
+       - No authentication required (local disk I/O)
+       - Deterministic transformations
+       - Examples: MembershipIntervalsBuilder (daily → intervals)
+
+    Implementation Pattern:
+    ----------------------
+    All builders implement two key methods:
+
+    - fetch_raw(**kwargs) -> pd.DataFrame:
+        * SOURCE: Fetch from external API/file/database
+        * TRANSFORM: Load from curated storage using self.loader
+
+    - transform_to_curated(raw_df, **kwargs) -> pd.DataFrame:
+        * Clean, standardize, and prepare data for curated storage
+        * Add metadata (schema_version, ingest_ts)
+        * Apply business logic and transformations
+
+    See docs/BUILDER_TYPES.md for complete guide on builder types.
     """
 
     def __init__(

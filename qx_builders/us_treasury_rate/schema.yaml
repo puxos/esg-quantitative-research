@@ -3,8 +3,8 @@
 
 dataset:
   domain: reference-rates
-  asset_class: null
-  subdomain: yield-curves  # US Treasury rates form a yield curve
+  asset_class: fixed-income
+  subdomain: yield-curves
   region: US  # Hardcoded: this builder is US-specific (FRED API)
   frequency: null  # Frequency is partitioned (daily/weekly/monthly)
 
@@ -74,7 +74,7 @@ contract:
       description: Filter by rate range (percentage)
       example: [0, 5]
 
-  path_template: data/curated/risk-free/treasury_rate/{schema_version}/rate_type={rate_type}/frequency={frequency}
+  path_template: data/curated/{domain}/{subdomain}/treasury_rate/{schema_version}/rate_type={rate_type}/frequency={frequency}
 
 parameters:
   rate_type:

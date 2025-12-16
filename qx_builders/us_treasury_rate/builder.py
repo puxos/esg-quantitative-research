@@ -20,6 +20,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from qx.common.contracts import DatasetContract, DatasetRegistry
 from qx.foundation.base_builder import DataBuilderBase
+from qx.storage.curated_writer import CuratedWriter
 from qx.storage.pathing import PathResolver
 from qx.storage.table_format import TableFormatAdapter
 from qx_builders.us_treasury_rate.utils import (
@@ -31,10 +32,13 @@ from qx_builders.us_treasury_rate.utils import (
 
 class USTreasuryRateBuilder(DataBuilderBase):
     """
-    Builder for US Treasury rates from FRED API.
+    SOURCE BUILDER: US Treasury rates from FRED API.
+
+    External Source: Federal Reserve Economic Data (FRED) API
+    Authentication: Requires FRED_API_KEY environment variable
 
     Fetches treasury constant maturity rates (3-month, 1-year, 5-year, 10-year, 30-year)
-    from Federal Reserve Economic Data (FRED) and transforms to curated format.
+    from FRED and transforms to curated format.
 
     YAML-based initialization only - uses builder.yaml configuration.
 
@@ -45,31 +49,18 @@ class USTreasuryRateBuilder(DataBuilderBase):
     FRED_API_URL = "https://api.stlouisfed.org/fred/series/observations"
 
     def __init__(
-        self,
-        package_dir: str,
-        registry: DatasetRegistry,
-        adapter: TableFormatAdapter,
-        resolver: PathResolver,
-        overrides: Optional[Dict] = None,
+        self, package_dir: str, writer: CuratedWriter, overrides: Optional[Dict] = None
     ):
         """
         Initialize US Treasury Rate builder from YAML configuration.
 
         Args:
             package_dir: Path to builder package containing builder.yaml
-            registry: Dataset registry for resolving contracts
-            adapter: Table format adapter for writing curated data
-            resolver: Path resolver for output paths
+            writer: High-level curated data writer
             overrides: Parameter overrides (e.g., {"rate_types": ["10year"], "start_date": "2020-01-01"})
         """
         # Load YAML configuration
-        super().__init__(
-            package_dir=package_dir,
-            registry=registry,
-            adapter=adapter,
-            resolver=resolver,
-            overrides=overrides,
-        )
+        super().__init__(package_dir=package_dir, writer=writer, overrides=overrides)
 
         # Get FRED API key from params or environment
         api_key = self.params.get("fred_api_key") or os.environ.get("FRED_API_KEY")

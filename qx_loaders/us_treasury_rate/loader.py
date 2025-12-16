@@ -7,32 +7,21 @@ Loads US Treasury rate data (risk-free rates) from curated storage.
 This loader:
 1. Loads treasury rate data for specified maturities
 2. Filters to the requested date range
-3. Returns a DataFrame with rate data
-
-Usage in DAG:
--------------
-```python
-Task(
-    id="LoadRiskFreeRate",
-    run=run_loader(
-        "qx_loaders/us_treasury_rate",
-        overrides={
-            "start_date": "2014-01-01",
-            "end_date": "2024-12-31",
-            "rate_types": ["3month"],
-            "frequency": "daily"
-        }
-    ),
-    deps=["BuildTreasuryRates"]
-)
-```
+3. Returns a DataFrame with rate data suitable for CAPM, Sharpe ratio, and fixed income analysis.
 """
 
 from pathlib import Path
 
 import pandas as pd
 
-from qx.common.types import AssetClass, DatasetType, Domain, Frequency, Region
+from qx.common.types import (
+    AssetClass,
+    DatasetType,
+    Domain,
+    Frequency,
+    Region,
+    Subdomain,
+)
 from qx.foundation.base_loader import BaseLoader
 
 
@@ -130,7 +119,7 @@ class USTreasuryRateLoader(BaseLoader):
         for rate_type in rate_types:
             try:
                 # Use typed loading with rate_type partition
-                df_rate = self.curated_loader.load(
+                df_rate = self.loader.load(
                     dataset_type=treasury_type,
                     partitions={"rate_type": rate_type, "frequency": frequency},
                 )
@@ -143,8 +132,7 @@ class USTreasuryRateLoader(BaseLoader):
         if not all_dfs:
             raise ValueError(
                 f"No data found for rate types {rate_types}. "
-                f"Make sure data has been built using the us_treasury_rate builder. "
-                f"Expected path: {base_path}"
+                f"Make sure data has been built using the us_treasury_rate builder."
             )
 
         # Combine all rate types
@@ -206,52 +194,3 @@ class USTreasuryRateLoader(BaseLoader):
             )
 
         return result_df
-
-
-# Example usage
-if __name__ == "__main__":
-    """
-    Example standalone usage (requires curated treasury rate data).
-    """
-    from qx.common.contracts import DatasetRegistry
-    from qx.common.predefined import seed_registry
-    from qx.storage.backend_local import LocalParquetBackend
-    from qx.storage.pathing import PathResolver
-
-    print("=" * 80)
-    print("US Treasury Rate Loader - Standalone Test")
-    print("=" * 80)
-
-    # Initialize infrastructure
-    registry = DatasetRegistry()
-    seed_registry(registry)
-
-    backend = LocalParquetBackend(base_uri="file://.")
-    resolver = PathResolver()
-
-    # Create loader
-    loader = USTreasuryRateLoader(
-        package_dir="qx_loaders/us_treasury_rate",
-        registry=registry,
-        backend=backend,
-        resolver=resolver,
-        overrides={
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
-            "rate_types": ["3month", "10year"],
-            "frequency": "daily",
-        },
-    )
-
-    # Load data
-    try:
-        rf_data = loader.load()
-        print(f"\n✅ Successfully loaded treasury rate data")
-        print(f"\nFirst 10 rows:")
-        print(rf_data.head(10))
-        print(f"\nLast 10 rows:")
-        print(rf_data.tail(10))
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-        print("\nNote: This example requires treasury rate data to be built first.")
-        print("Run: python examples/test_treasury_builder.py")
