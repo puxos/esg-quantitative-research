@@ -364,10 +364,10 @@ def test_full_pipeline_with_builder(storage_infrastructure, package_dir):
         results = dag.execute()
 
         if results is not None:
-            assert "LoadTreasuryRates" in results
-            assert results["LoadTreasuryRates"]["status"] == "success"
+            assert "LoadUSTreasuryRate" in results
+            assert results["LoadUSTreasuryRate"]["status"] == "success"
 
-            df = results["LoadTreasuryRates"]["output"]
+            df = results["LoadUSTreasuryRate"]["output"]
             assert isinstance(df, pd.DataFrame)
             assert len(df) > 0
         else:

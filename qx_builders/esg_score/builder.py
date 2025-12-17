@@ -351,7 +351,9 @@ class ESGScoreBuilder(DataBuilderBase):
                 continue
 
             # Add metadata
-            year_data["schema_version"] = self.output_dt_template.frequency or "v1"
+            # Convert Frequency enum to string if present
+            freq = self.output_dt_template.frequency
+            year_data["schema_version"] = freq.value if freq else "v1"
             year_data["ingest_ts"] = pd.Timestamp.utcnow()
 
             # Write partition using writer abstraction

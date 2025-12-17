@@ -305,3 +305,5 @@ class DAG:
                     progressed = True
             if not progressed:
                 raise RuntimeError("DAG deadlock: dependencies not satisfied")
+
+        return self.context

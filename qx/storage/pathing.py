@@ -21,7 +21,7 @@ class PathResolver:
     1. Explicit env_read/env_write parameters
     2. QX_ENV_READ/QX_ENV_WRITE environment variables
     3. storage.env_read/env_write in config/config.yaml
-    4. Backward compat: QX_MODE env var or storage.env (applies to both read/write)
+    4. Default: prod for both read and write
 
     Usage:
         # Auto-detect from env/config
@@ -30,15 +30,11 @@ class PathResolver:
         # Separate read/write environments (recommended for loaders/models)
         resolver = PathResolver(env_read="prod", env_write="dev")
 
-        # Single environment (backward compatible)
-        resolver = PathResolver(env="prod")
-
         # Convenience constructors
         resolver = PathResolver.for_dev()  # Both read and write
         resolver = PathResolver.for_prod()
     """
 
-    env: Optional[str] = None  # Backward compat: single environment for both read/write
     env_read: Optional[str] = None  # Environment for reading curated data
     env_write: Optional[str] = None  # Environment for writing processed data
     _config_cache: Optional[Dict] = None
@@ -63,31 +59,10 @@ class PathResolver:
         """Check if resolver is in prod environment (both read and write)."""
         return self.env_read == "prod" and self.env_write == "prod"
 
-    @property
-    def effective_env(self) -> str:
-        """
-        Get effective environment for compatibility.
-
-        Returns:
-            - "prod" if both read and write are prod
-            - "dev" if both read and write are dev
-            - "mixed" if read and write environments differ
-        """
-        if self.env_read == self.env_write:
-            return self.env_read
-        return "mixed"
-
     def __post_init__(self):
         """Initialize read/write environments from environment variables or config if not explicitly set."""
         config = self._load_config()
         storage_config = config.get("storage", {})
-
-        # Handle backward compatible single env parameter
-        if self.env is not None:
-            if self.env_read is None:
-                self.env_read = self.env
-            if self.env_write is None:
-                self.env_write = self.env
 
         # Initialize env_read
         if self.env_read is None:
@@ -96,13 +71,7 @@ class PathResolver:
 
             # Try storage.env_read from config
             if self.env_read is None:
-                self.env_read = storage_config.get("env_read")
-
-            # Fall back to single env (backward compat)
-            if self.env_read is None:
-                self.env_read = os.environ.get("QX_MODE") or storage_config.get(
-                    "env", "prod"
-                )
+                self.env_read = storage_config.get("env_read", "prod")
 
         # Initialize env_write
         if self.env_write is None:
@@ -111,13 +80,7 @@ class PathResolver:
 
             # Try storage.env_write from config
             if self.env_write is None:
-                self.env_write = storage_config.get("env_write")
-
-            # Fall back to single env (backward compat)
-            if self.env_write is None:
-                self.env_write = os.environ.get("QX_MODE") or storage_config.get(
-                    "env", "prod"
-                )
+                self.env_write = storage_config.get("env_write", "prod")
 
         # Validate environments
         for env_name, env_value in [
@@ -165,6 +128,28 @@ class PathResolver:
             return paths.get("dev", {}).get(data_type, f"data/dev/{data_type}")
         else:  # prod
             return paths.get("prod", {}).get(data_type, f"data/{data_type}")
+
+    def resolve_path(
+        self,
+        contract: DatasetContract,
+        partitions: Dict[str, str],
+        run_id: Optional[str] = None,
+    ) -> str:
+        """
+        Resolve storage path for curated data (high-level API).
+
+        This is a convenience method that wraps curated_dir() for use
+        by CuratedWriter. For processed data, use processed_dir().
+
+        Args:
+            contract: Dataset contract with path template
+            partitions: Partition values to format into path
+            run_id: Optional run identifier (unused for curated data)
+
+        Returns:
+            Full path with environment prefix
+        """
+        return self.curated_dir(contract, partitions)
 
     def curated_dir(self, c: DatasetContract, partitions: Dict[str, str]) -> str:
         """

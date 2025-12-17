@@ -101,27 +101,3 @@ class CuratedWriter:
         )
 
         return str(output_path)
-
-    def write_to_path(
-        self,
-        data: pd.DataFrame,
-        path: Union[str, Path],
-        write_mode: str = "append",
-    ) -> str:
-        """
-        Write data to explicit path (for non-contract writes).
-
-        Args:
-            data: DataFrame to write
-            path: Output path
-            write_mode: Write mode ("append" or "overwrite")
-
-        Returns:
-            Path where data was written
-        """
-        self.adapter.write(
-            data=data,
-            path=Path(path),
-            write_mode=write_mode,
-        )
-        return str(path)

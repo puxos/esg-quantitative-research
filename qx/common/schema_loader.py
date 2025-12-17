@@ -101,8 +101,6 @@ class SchemaLoader:
         "instrument-reference": Domain.INSTRUMENT_REFERENCE,
         "metadata": Domain.METADATA,
         "data-products": Domain.DATA_PRODUCTS,
-        # Legacy mappings for backward compatibility
-        "processed": Domain.DERIVED_METRICS,
     }
 
     ASSET_CLASS_MAP = {

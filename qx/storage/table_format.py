@@ -13,6 +13,34 @@ class TableFormatAdapter:
     table_format: str = "parquet"
     write_mode: str = "append"  # "append" or "overwrite"
 
+    def write(
+        self,
+        data: pd.DataFrame,
+        path: str,
+        write_mode: str = None,
+    ) -> str:
+        """
+        Write data to storage path (high-level API).
+
+        Args:
+            data: DataFrame to write
+            path: Directory path (relative or absolute) where data should be written
+            write_mode: Write mode - "append" or "overwrite"
+
+        Returns:
+            Full path to written file
+        """
+        from datetime import datetime
+
+        mode = write_mode or self.write_mode
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"part-{timestamp}.parquet"
+
+        # Path is already the directory - just write to it
+        self.write_batch(data, path, filename, mode=mode)
+
+        return f"{path}/{filename}"
+
     def write_batch(
         self, df: pd.DataFrame, rel_dir: str, filename: str, mode: str = None
     ) -> str:

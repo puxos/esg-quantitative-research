@@ -113,7 +113,7 @@ def run_loader(
     # Extract input requirements from loader.yaml (if any)
     import yaml
 
-    from qx.engine.base_model import dt_from_cfg
+    from qx.common.types import dataset_type_from_config
 
     with open(loader_yaml, "r") as f:
         loader_config = yaml.safe_load(f)
@@ -125,7 +125,7 @@ def run_loader(
             input_requirements.append(
                 {
                     "name": inp["name"],
-                    "type": dt_from_cfg(inp["type"]),
+                    "type": dataset_type_from_config(inp["type"]),
                     "required": inp.get("required", True),
                     "description": inp.get("description", ""),
                 }
@@ -261,12 +261,12 @@ def run_builder(
     # Extract output type and input requirements from builder.yaml
     import yaml
 
-    from qx.foundation.base_builder import dt_from_cfg
+    from qx.common.types import dataset_type_from_config
 
     with open(builder_yaml, "r") as f:
         builder_config = yaml.safe_load(f)
 
-    output_type = dt_from_cfg(builder_config["io"]["output"]["type"])
+    output_type = dataset_type_from_config(builder_config["io"]["output"]["type"])
 
     # Check if builder has curated data inputs
     input_requirements = []
@@ -275,7 +275,7 @@ def run_builder(
             input_requirements.append(
                 {
                     "name": inp["name"],
-                    "type": dt_from_cfg(inp["type"]),
+                    "type": dataset_type_from_config(inp["type"]),
                     "required": inp.get("required", True),
                     "description": inp.get("description", ""),
                 }
@@ -413,18 +413,18 @@ def run_model(
     # Extract output type and input requirements from model.yaml for DAG validation
     import yaml
 
-    from qx.engine.base_model import dt_from_cfg
+    from qx.common.types import dataset_type_from_config
 
     with open(model_yaml, "r") as f:
         model_config = yaml.safe_load(f)
 
-    output_type = dt_from_cfg(model_config["io"]["output"]["type"])
+    output_type = dataset_type_from_config(model_config["io"]["output"]["type"])
 
     # Extract input requirements for DAG validation
     input_requirements = [
         {
             "name": inp["name"],
-            "type": dt_from_cfg(inp["type"]),
+            "type": dataset_type_from_config(inp["type"]),
             "required": inp.get("required", True),
             "description": inp.get("description", ""),
         }

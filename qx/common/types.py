@@ -131,3 +131,85 @@ class DatasetType:
     region: Optional[Region] = None  # Contract-level: US, HK, GLOBAL
     frequency: Optional[Frequency] = None
     dims: Tuple[Tuple[str, str], ...] = field(default_factory=tuple)
+
+
+# ============================================================================
+# Enum Conversion Utilities
+# ============================================================================
+
+
+def to_enum(enum_class: type[Enum], value: any) -> Optional[Enum]:
+    """
+    Convert string or enum value to enum instance.
+
+    Shared utility for converting YAML config values to enums.
+    Handles both value-based ("market-data") and name-based ("MARKET_DATA") lookups.
+
+    Args:
+        enum_class: Enum class to convert to
+        value: String value, enum instance, or None
+
+    Returns:
+        Enum instance or None if value is None
+
+    Raises:
+        ValueError: If value doesn't match any enum member
+
+    Example:
+        >>> to_enum(Domain, "market-data")
+        <Domain.MARKET_DATA: 'market-data'>
+        >>> to_enum(Frequency, None)
+        None
+    """
+    if value is None:
+        return None
+
+    if isinstance(value, enum_class):
+        return value
+
+    # Try value match first (e.g., "market-data")
+    for member in enum_class:
+        if member.value == value:
+            return member
+
+    # Try name match (e.g., "MARKET_DATA")
+    for member in enum_class:
+        if member.name == value:
+            return member
+
+    raise ValueError(f"Unknown {enum_class.__name__}: {value}")
+
+
+def dataset_type_from_config(config: dict) -> DatasetType:
+    """
+    Create DatasetType from YAML configuration dictionary.
+
+    Shared utility for creating DatasetType instances from builder.yaml, model.yaml, etc.
+    Performs enum conversion and validation.
+
+    Args:
+        config: Configuration dict with domain, asset_class, subdomain, etc.
+
+    Returns:
+        DatasetType instance
+
+    Raises:
+        ValueError: If domain is missing or enum values are invalid
+
+    Example:
+        >>> config = {"domain": "market-data", "subdomain": "bars", "frequency": "daily"}
+        >>> dataset_type_from_config(config)
+        DatasetType(domain=<Domain.MARKET_DATA: 'market-data'>, ...)
+    """
+    domain = to_enum(Domain, config.get("domain"))
+    if domain is None:
+        raise ValueError("Domain is required in dataset type configuration")
+
+    return DatasetType(
+        domain=domain,
+        asset_class=to_enum(AssetClass, config.get("asset_class")),
+        subdomain=to_enum(Subdomain, config.get("subdomain")),
+        subtype=config.get("subtype"),  # Custom string, no enum conversion
+        region=to_enum(Region, config.get("region")),
+        frequency=to_enum(Frequency, config.get("frequency")),
+    )

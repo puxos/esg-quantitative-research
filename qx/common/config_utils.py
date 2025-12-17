@@ -1,14 +1,69 @@
 """
 Configuration Utilities for Qx
 
-Helpers for loading configuration and initializing external clients.
+Helpers for loading configuration, resolving parameters, and initializing external clients.
 """
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import yaml
 from tiingo import TiingoClient
+
+
+def resolve_parameters(spec: Dict, overrides: Optional[Dict] = None) -> Dict:
+    """
+    Resolve parameters from spec with type conversion and overrides.
+
+    Shared utility used by builders, loaders, and models to parse YAML parameters
+    and apply runtime overrides with appropriate type conversions.
+
+    Args:
+        spec: Parameter specification from YAML (e.g., builder.yaml "parameters" section)
+        overrides: Runtime parameter overrides (e.g., from DAG or factory)
+
+    Returns:
+        Resolved parameters dictionary with type conversions applied
+
+    Example:
+        >>> spec = {"count": {"type": "int", "default": 10}, "name": {"type": "str", "default": "test"}}
+        >>> resolve_parameters(spec, {"count": "20"})
+        {'count': 20, 'name': 'test'}
+    """
+    overrides = overrides or {}
+    params = {}
+
+    for key, param_spec in spec.items():
+        value = overrides.get(key, param_spec.get("default"))
+        param_type = param_spec.get("type")
+
+        # Skip type conversion if value is None
+        if value is None:
+            params[key] = value
+            continue
+
+        # Apply type conversions
+        if param_type == "int":
+            value = int(value)
+        elif param_type == "float":
+            value = float(value)
+        elif param_type == "bool":
+            value = (
+                value
+                if isinstance(value, bool)
+                else str(value).lower() in ("1", "true", "yes")
+            )
+        elif param_type == "enum":
+            allowed = param_spec.get("allowed", [])
+            if value not in allowed:
+                raise ValueError(
+                    f"Parameter '{key}' must be one of {allowed}, got '{value}'"
+                )
+        # For "str" or unspecified type, keep value as-is
+
+        params[key] = value
+
+    return params
 
 
 def load_config(config_path: str = "config/settings.yaml") -> Dict[str, Any]:

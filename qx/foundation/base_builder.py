@@ -7,72 +7,14 @@ from typing import Dict, List, Optional, Union
 import pandas as pd
 import yaml
 
+from qx.common.config_utils import resolve_parameters
 from qx.common.contracts import DatasetContract, DatasetRegistry
-from qx.common.enum_validator import (
-    EnumValidationError,
-    validate_dataset_type_config,
-    validate_frequency_parameter,
-)
+from qx.common.enum_validator import EnumValidationError, validate_dataset_type_config
 from qx.common.env_loader import load_env_file
-from qx.common.types import (
-    AssetClass,
-    DatasetType,
-    Domain,
-    Frequency,
-    Region,
-    Subdomain,
-)
+from qx.common.types import DatasetType, Frequency, dataset_type_from_config
 from qx.storage.curated_writer import CuratedWriter
 from qx.storage.pathing import PathResolver
 from qx.storage.table_format import TableFormatAdapter
-
-
-def dt_from_cfg(d: Dict) -> DatasetType:
-    """
-    Convert YAML config dict to DatasetType with strict enum validation.
-
-    Raises:
-        EnumValidationError: If any enum value is invalid
-    """
-    try:
-        validated = validate_dataset_type_config(d)
-
-        # Convert string values to enums (None if not provided)
-        domain = Domain(validated["domain"]) if validated.get("domain") else None
-        asset_class = (
-            AssetClass(validated["asset_class"])
-            if validated.get("asset_class")
-            else None
-        )
-        subdomain = (
-            Subdomain(validated["subdomain"]) if validated.get("subdomain") else None
-        )
-        subtype = (
-            str(validated["subtype"]) if validated.get("subtype") else None
-        )  # Custom string, no enum conversion
-        region = Region(validated["region"]) if validated.get("region") else None
-        frequency = (
-            Frequency(validated["frequency"]) if validated.get("frequency") else None
-        )
-
-        # Domain is required, others are optional
-        if domain is None:
-            raise ValueError("Domain is required in io.output.type configuration")
-
-        # DatasetType requires all parameters (domain required, others can be None)
-        return DatasetType(
-            domain=domain,
-            asset_class=asset_class,
-            subdomain=subdomain,
-            subtype=subtype,
-            region=region,
-            frequency=frequency,
-        )
-    except EnumValidationError as e:
-        raise ValueError(
-            f"Invalid dataset type configuration in builder.yaml:\n{str(e)}\n"
-            f"Check your io.output.type section in builder.yaml"
-        )
 
 
 class DataBuilderBase(abc.ABC):
@@ -143,8 +85,20 @@ class DataBuilderBase(abc.ABC):
             cfg = yaml.safe_load(f)
 
         self.info = cfg["builder"]
-        self.output_dt_template = dt_from_cfg(cfg["io"]["output"]["type"])
-        self.params = self._resolve_params(cfg.get("parameters", {}), overrides or {})
+
+        try:
+            # Validate enum values before conversion
+            validate_dataset_type_config(cfg["io"]["output"]["type"])
+            self.output_dt_template = dataset_type_from_config(
+                cfg["io"]["output"]["type"]
+            )
+        except (EnumValidationError, ValueError) as e:
+            raise ValueError(
+                f"Invalid dataset type in builder.yaml:\n{str(e)}\n"
+                f"Check your io.output.type section"
+            )
+
+        self.params = resolve_parameters(cfg.get("parameters", {}), overrides)
         self.partition_spec = cfg.get("partitions", {})
 
         # Resolve relative paths in parameters (relative to package directory)
@@ -163,47 +117,11 @@ class DataBuilderBase(abc.ABC):
             )
         self.write_mode = write_mode
 
-        # Apply mode override if specified in builder.yaml
-        # This allows packages to force a specific mode (e.g., reference data always uses prod)
-        package_mode = self.info.get("mode")
-        resolver_source = writer.resolver
-        if (
-            package_mode
-            and hasattr(resolver_source, "mode")
-            and resolver_source.mode != package_mode
-        ):
-            # Create new resolver with overridden mode
-            self.resolver = PathResolver(mode=package_mode)
-        else:
-            self.resolver = resolver_source
+        # Use resolver from writer
+        self.resolver = writer.resolver
 
         # Contract will be resolved in build() with actual partition values
         self.contract = None
-
-    def _resolve_params(self, spec: Dict, overrides: Dict) -> Dict:
-        """Resolve parameters from spec + overrides (same logic as BaseModel)."""
-        out = {}
-        for k, s in spec.items():
-            v = overrides.get(k, s.get("default"))
-            t = s.get("type")
-
-            # Skip type conversion if value is None
-            if v is None:
-                out[k] = v
-                continue
-
-            if t == "int":
-                v = int(v)
-            elif t == "float":
-                v = float(v)
-            elif t == "bool":
-                v = v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes")
-            elif t == "enum":
-                allowed = s.get("allowed", [])
-                assert v in allowed, f"Param {k} must be one of {allowed}"
-            # string type: keep as-is
-            out[k] = v
-        return out
 
     def _resolve_relative_paths(self):
         """
@@ -218,21 +136,20 @@ class DataBuilderBase(abc.ABC):
             Package: qx_builders/sp500_membership
             Resolved: /absolute/path/to/qx_builders/sp500_membership/raw
         """
+        path_suffixes = ("_path", "_root", "_file", "_dir")
+
         for param_name, param_value in self.params.items():
             # Check if parameter looks like a file/directory path
             if (
-                param_name.endswith("_path")
-                or param_name.endswith("_root")
-                or param_name.endswith("_file")
-                or param_name.endswith("_dir")
+                param_name.endswith(path_suffixes)
+                and isinstance(param_value, str)
+                and param_value
             ):
-
-                if isinstance(param_value, str) and param_value:
-                    path = Path(param_value)
-                    # Only resolve if it's a relative path
-                    if not path.is_absolute():
-                        resolved_path = (self.package_dir / path).resolve()
-                        self.params[param_name] = str(resolved_path)
+                path = Path(param_value)
+                # Only resolve if it's a relative path
+                if not path.is_absolute():
+                    resolved_path = (self.package_dir / path).resolve()
+                    self.params[param_name] = str(resolved_path)
 
     @abc.abstractmethod
     def fetch_raw(self, **kwargs) -> pd.DataFrame: ...
@@ -309,25 +226,13 @@ class DataBuilderBase(abc.ABC):
         if missing_keys:
             # Need to split data by missing partition keys and write separately
             output_paths = []
+            partition_groups = self._group_by_partitions(curated, missing_keys)
 
-            # Group by all missing partition keys
-            if len(missing_keys) == 1:
-                groups = curated.groupby(missing_keys[0])
-            else:
-                groups = curated.groupby(missing_keys)
-
-            for group_key, group_df in groups:
-                # Create partition dict with group values
-                partition_copy = partitions.copy()
-                if len(missing_keys) == 1:
-                    partition_copy[missing_keys[0]] = group_key
-                else:
-                    # group_key is a tuple when grouping by multiple keys
-                    group_key_tuple = (
-                        group_key if isinstance(group_key, tuple) else (group_key,)
-                    )
-                    for i, key in enumerate(missing_keys):
-                        partition_copy[key] = group_key_tuple[i]
+            for partition_values, group_df in partition_groups:
+                # Merge partition values with base partitions
+                partition_copy = self._merge_partition_values(
+                    partitions, missing_keys, partition_values
+                )
 
                 # Write this partition
                 rel_dir = self.resolver.curated_dir(self.contract, partition_copy)
@@ -345,3 +250,40 @@ class DataBuilderBase(abc.ABC):
             return self.adapter.write_batch(
                 curated, rel_dir, filename, mode=self.write_mode
             )
+
+    def _group_by_partitions(self, df: pd.DataFrame, partition_keys: List[str]):
+        """
+        Group DataFrame by partition keys.
+
+        Args:
+            df: DataFrame to group
+            partition_keys: List of column names to group by
+
+        Returns:
+            Iterator of (partition_values, group_df) tuples
+        """
+        if len(partition_keys) == 1:
+            for key, group in df.groupby(partition_keys[0]):
+                yield (key,), group
+        else:
+            for keys, group in df.groupby(partition_keys):
+                yield keys if isinstance(keys, tuple) else (keys,), group
+
+    def _merge_partition_values(
+        self, base_partitions: dict, keys: List[str], values: tuple
+    ) -> dict:
+        """
+        Merge partition values into base partition dict.
+
+        Args:
+            base_partitions: Base partition dictionary
+            keys: Partition key names
+            values: Partition values (tuple)
+
+        Returns:
+            Merged partition dictionary
+        """
+        result = base_partitions.copy()
+        for key, value in zip(keys, values):
+            result[key] = value
+        return result

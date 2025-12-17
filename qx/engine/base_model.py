@@ -5,36 +5,10 @@ from typing import Dict, List, Optional
 import pandas as pd
 import yaml
 
+from qx.common.config_utils import resolve_parameters
 from qx.common.contracts import DatasetContract, DatasetRegistry
-from qx.common.types import (
-    AssetClass,
-    DatasetType,
-    Domain,
-    Frequency,
-    Region,
-    Subdomain,
-)
+from qx.common.types import DatasetType, dataset_type_from_config
 from qx.engine.processed_writer import ProcessedWriterBase
-
-
-def _enum(cls, val):
-    if val is None:
-        return None
-    for e in cls:
-        if e.value == val or e.name == val:
-            return e
-    raise ValueError(f"Unknown {cls.__name__}: {val}")
-
-
-def dt_from_cfg(d: Dict) -> DatasetType:
-    return DatasetType(
-        _enum(Domain, d["domain"]),
-        _enum(AssetClass, d.get("asset_class")),
-        _enum(Subdomain, d.get("subdomain")),
-        d.get("subtype"),  # Custom string, no enum conversion
-        _enum(Region, d.get("region")),
-        _enum(Frequency, d.get("frequency")),
-    )
 
 
 class BaseModel(abc.ABC):
@@ -63,26 +37,9 @@ class BaseModel(abc.ABC):
         self.registry = loader.registry
         self.info = cfg["model"]
         self.inputs_cfg = cfg["io"]["inputs"]
-        self.output_dt = dt_from_cfg(cfg["io"]["output"]["type"])
-        self.params = self._resolve_params(cfg.get("parameters", {}), overrides or {})
+        self.output_dt = dataset_type_from_config(cfg["io"]["output"]["type"])
+        self.params = resolve_parameters(cfg.get("parameters", {}), overrides)
         self.constraints = cfg.get("constraints", {})
-
-    def _resolve_params(self, spec: Dict, overrides: Dict) -> Dict:
-        out = {}
-        for k, s in spec.items():
-            v = overrides.get(k, s.get("default"))
-            t = s.get("type")
-            if t == "int":
-                v = int(v)
-            elif t == "float":
-                v = float(v)
-            elif t == "bool":
-                v = v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes")
-            elif t == "enum":
-                allowed = s.get("allowed", [])
-                assert v in allowed, f"Param {k} must be one of {allowed}"
-            out[k] = v
-        return out
 
     def _resolve_inputs(
         self, available_types: List[DatasetType]
@@ -90,7 +47,7 @@ class BaseModel(abc.ABC):
         resolved = {}
         for inp in self.inputs_cfg:
             name = inp["name"]
-            pattern = dt_from_cfg(inp["type"])
+            pattern = dataset_type_from_config(inp["type"])
             match = [
                 dt
                 for dt in available_types
