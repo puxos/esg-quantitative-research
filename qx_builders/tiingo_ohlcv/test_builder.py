@@ -226,7 +226,7 @@ def test_error_handling_missing_api_key(package_dir, storage_infrastructure):
 def test_error_handling_invalid_symbol(builder):
     """Test error handling for invalid symbol with fail_on_error=False."""
     from unittest.mock import patch
-    
+
     # Mock the helper method that fetches single symbol data to return empty (invalid symbol)
     with patch.object(builder, "_fetch_single_symbol", return_value=pd.DataFrame()):
         # Pass symbols and fail_on_error in kwargs (as base class does)
@@ -347,7 +347,7 @@ def example_basic_usage():
     from qx.common.contracts import DatasetRegistry
     from qx.common.predefined import seed_registry
     from qx.storage.table_format import TableFormatAdapter
-    
+
     registry = DatasetRegistry()
     seed_registry(registry)
     backend = LocalParquetBackend(base_uri="file://.")

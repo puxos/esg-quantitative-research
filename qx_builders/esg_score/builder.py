@@ -20,7 +20,7 @@ from qx_builders.gvkey_mapping import load_gvkey_mapping_from_curated
 class ESGScoreBuilder(DataBuilderBase):
     """
     SOURCE BUILDER: ESG scores from local Excel/CSV files.
-    
+
     External Source: Local data files (data_matlab_ESG_withSIC.xlsx)
     Authentication: None (local files)
 
@@ -359,7 +359,7 @@ class ESGScoreBuilder(DataBuilderBase):
             output_path = self.writer.write(
                 data=year_data,
                 dataset_type=self.output_dt_template,
-                partitions=partitions_dict
+                partitions=partitions_dict,
             )
             output_paths.append(output_path)
 
@@ -368,13 +368,16 @@ class ESGScoreBuilder(DataBuilderBase):
             )
 
         print(f"\n✅ Built {len(output_paths)} ESG year partitions")
-        
+
         # Return manifest dict
         return {
             "status": "success",
             "builder": self.info["id"],
             "version": self.info["version"],
             "output_path": output_paths[0] if output_paths else None,
-            "rows": sum(len(curated[curated["esg_year"] == y]) for y in range(start_esg_year, end_esg_year + 1)),
-            "layer": "curated"
+            "rows": sum(
+                len(curated[curated["esg_year"] == y])
+                for y in range(start_esg_year, end_esg_year + 1)
+            ),
+            "layer": "curated",
         }

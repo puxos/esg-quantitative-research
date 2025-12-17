@@ -79,7 +79,9 @@ def builder_with_api_key(package_dir, storage_infrastructure):
     return USTreasuryRateBuilder(
         package_dir=package_dir,
         writer=storage_infrastructure["writer"],
-        overrides={"fred_api_key": api_key} if api_key == "test_api_key_placeholder" else None,
+        overrides=(
+            {"fred_api_key": api_key} if api_key == "test_api_key_placeholder" else None
+        ),
     )
 
 
@@ -172,7 +174,9 @@ def test_fetch_raw_with_real_api(builder_with_api_key):
     api_key = os.environ.get("FRED_API_KEY")
 
     if not api_key or api_key == "test_api_key_placeholder":
-        pytest.skip("FRED API key not available (set FRED_API_KEY environment variable)")
+        pytest.skip(
+            "FRED API key not available (set FRED_API_KEY environment variable)"
+        )
 
     # Fetch small date range
     builder_with_api_key.params["rate_types"] = ["10year"]
@@ -210,6 +214,7 @@ def test_fetch_raw_mock(builder):
 
 def test_fetch_raw_multiple_rates(builder):
     """Test fetching multiple rate types."""
+
     # Mock needs to return a fresh copy each time (fetch_raw modifies the DataFrame)
     def mock_fetch_single_rate(rate_type, start_date, end_date):
         return pd.DataFrame(
@@ -219,7 +224,9 @@ def test_fetch_raw_multiple_rates(builder):
             }
         )
 
-    with patch.object(builder, "_fetch_single_rate", side_effect=mock_fetch_single_rate):
+    with patch.object(
+        builder, "_fetch_single_rate", side_effect=mock_fetch_single_rate
+    ):
         builder.params["rate_types"] = ["10year", "5year", "30year"]
         df = builder.fetch_raw()
 
@@ -247,9 +254,7 @@ def test_fetch_raw_empty_response(builder):
 
 def test_transform_to_curated_basic(builder, sample_raw_data):
     """Test basic transformation of raw treasury data."""
-    curated = builder.transform_to_curated(
-        sample_raw_data, frequency="daily"
-    )
+    curated = builder.transform_to_curated(sample_raw_data, frequency="daily")
 
     assert len(curated) > 0
     assert "date" in curated.columns
@@ -300,12 +305,11 @@ def test_transform_empty_dataframe(builder):
 
 def test_transform_date_conversion(builder, sample_raw_data):
     """Test date conversion to proper format."""
-    curated = builder.transform_to_curated(
-        sample_raw_data, frequency="daily"
-    )
+    curated = builder.transform_to_curated(sample_raw_data, frequency="daily")
 
     # Check date is properly converted to date.date object
     import datetime
+
     assert isinstance(curated["date"].iloc[0], datetime.date)
 
 
@@ -367,9 +371,7 @@ def test_resample_preserves_rate_types(builder):
 
 def test_output_schema_validation(builder, sample_raw_data):
     """Test that output schema matches contract requirements."""
-    curated = builder.transform_to_curated(
-        sample_raw_data, frequency="daily"
-    )
+    curated = builder.transform_to_curated(sample_raw_data, frequency="daily")
 
     # Check required columns
     required_cols = ["date", "rate_type", "rate", "series_id", "frequency", "source"]

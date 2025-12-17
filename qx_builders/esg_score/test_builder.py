@@ -113,9 +113,10 @@ def test_configuration_loading(builder):
 def test_raw_file_path(builder):
     """Test that raw file path is set correctly."""
     assert hasattr(builder, "esg_source_path")
-    assert "data_matlab_ESG" in str(builder.esg_source_path) or "esg" in str(
-        builder.esg_source_path
-    ).lower()
+    assert (
+        "data_matlab_ESG" in str(builder.esg_source_path)
+        or "esg" in str(builder.esg_source_path).lower()
+    )
 
 
 def test_ticker_mapper_initialization(builder):
@@ -183,9 +184,7 @@ def test_transform_to_curated_basic(builder, sample_gvkey_mapping):
         }
     )
 
-    curated = builder.transform_to_curated(
-        raw_df, sample_gvkey_mapping, exchange="US"
-    )
+    curated = builder.transform_to_curated(raw_df, sample_gvkey_mapping, exchange="US")
 
     assert len(curated) > 0
     assert "ticker" in curated.columns
@@ -214,9 +213,7 @@ def test_transform_gvkey_mapping(builder, sample_gvkey_mapping):
         }
     )
 
-    curated = builder.transform_to_curated(
-        raw_df, sample_gvkey_mapping, exchange="US"
-    )
+    curated = builder.transform_to_curated(raw_df, sample_gvkey_mapping, exchange="US")
 
     # Should map AAPL and MSFT, drop unmapped GVKEY 99999
     assert len(curated) == 2
@@ -238,9 +235,7 @@ def test_transform_deduplication(builder, sample_gvkey_mapping):
         }
     )
 
-    curated = builder.transform_to_curated(
-        raw_df, sample_gvkey_mapping, exchange="US"
-    )
+    curated = builder.transform_to_curated(raw_df, sample_gvkey_mapping, exchange="US")
 
     # Should have only 1 record (deduplicated)
     assert len(curated) == 1
@@ -262,9 +257,7 @@ def test_transform_removes_missing_scores(builder, sample_gvkey_mapping):
         }
     )
 
-    curated = builder.transform_to_curated(
-        raw_df, sample_gvkey_mapping, exchange="US"
-    )
+    curated = builder.transform_to_curated(raw_df, sample_gvkey_mapping, exchange="US")
 
     # Should only have AAPL (MSFT removed due to missing score)
     assert len(curated) == 1
@@ -288,9 +281,7 @@ def test_transform_empty_dataframe(builder, sample_gvkey_mapping):
     """Test transform with empty DataFrame."""
     raw_df = pd.DataFrame()
 
-    curated = builder.transform_to_curated(
-        raw_df, sample_gvkey_mapping, exchange="US"
-    )
+    curated = builder.transform_to_curated(raw_df, sample_gvkey_mapping, exchange="US")
 
     assert curated.empty
 
@@ -309,9 +300,7 @@ def test_transform_year_lag(builder, sample_gvkey_mapping):
         }
     )
 
-    curated = builder.transform_to_curated(
-        raw_df, sample_gvkey_mapping, exchange="US"
-    )
+    curated = builder.transform_to_curated(raw_df, sample_gvkey_mapping, exchange="US")
 
     # ESG year 2013 → available for 2014 trading
     assert curated["esg_year"].values[0] == 2013
@@ -337,9 +326,7 @@ def test_output_schema_validation(builder, sample_gvkey_mapping):
         }
     )
 
-    curated = builder.transform_to_curated(
-        raw_df, sample_gvkey_mapping, exchange="US"
-    )
+    curated = builder.transform_to_curated(raw_df, sample_gvkey_mapping, exchange="US")
 
     # Check required columns
     required_cols = [

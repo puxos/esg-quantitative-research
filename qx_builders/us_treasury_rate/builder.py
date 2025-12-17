@@ -68,7 +68,7 @@ class USTreasuryRateBuilder(DataBuilderBase):
             key="FRED_API_KEY",
             param_name="fred_api_key",
             param_value=self.params.get("fred_api_key"),
-            required=True
+            required=True,
         )
 
     @retry(

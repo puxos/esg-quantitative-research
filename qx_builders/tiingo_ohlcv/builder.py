@@ -28,7 +28,7 @@ from qx.utils.date_utils import (
 class TiingoOHLCVBuilder(DataBuilderBase):
     """
     SOURCE BUILDER: Equity price data from Tiingo API.
-    
+
     External Source: Tiingo REST API
     Authentication: Requires TIINGO_API_KEY environment variable or tiingo_api_key parameter
 
@@ -66,7 +66,7 @@ class TiingoOHLCVBuilder(DataBuilderBase):
             key="TIINGO_API_KEY",
             param_name="tiingo_api_key",
             param_value=self.params.get("tiingo_api_key"),
-            required=True
+            required=True,
         )
 
         # Initialize Tiingo client
