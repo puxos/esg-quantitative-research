@@ -19,6 +19,7 @@ import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from qx.common.contracts import DatasetContract, DatasetRegistry
+from qx.common.env_loader import get_env_var
 from qx.foundation.base_builder import DataBuilderBase
 from qx.storage.curated_writer import CuratedWriter
 from qx.storage.pathing import PathResolver
@@ -59,19 +60,16 @@ class USTreasuryRateBuilder(DataBuilderBase):
             writer: High-level curated data writer
             overrides: Parameter overrides (e.g., {"rate_types": ["10year"], "start_date": "2020-01-01"})
         """
-        # Load YAML configuration
+        # Load YAML configuration (.env file is auto-loaded by base class)
         super().__init__(package_dir=package_dir, writer=writer, overrides=overrides)
 
-        # Get FRED API key from params or environment
-        api_key = self.params.get("fred_api_key") or os.environ.get("FRED_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "FRED API key is required. "
-                "Set 'fred_api_key' parameter or FRED_API_KEY environment variable. "
-                "Get a free API key at https://fred.stlouisfed.org/docs/api/api_key.html"
-            )
-
-        self.fred_api_key = api_key
+        # Get FRED API key (checks param, then .env, then raises error)
+        self.fred_api_key = get_env_var(
+            key="FRED_API_KEY",
+            param_name="fred_api_key",
+            param_value=self.params.get("fred_api_key"),
+            required=True
+        )
 
     @retry(
         stop=stop_after_attempt(3),

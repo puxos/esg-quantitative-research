@@ -60,16 +60,16 @@ class UniverseAtDateLoader(BaseLoader):
 
         # Load membership intervals from curated data via typed loader (contract-based)
         membership_type = DatasetType(
-            domain=Domain.MEMBERSHIP,
+            domain=Domain.INSTRUMENT_REFERENCE,
             asset_class=None,
-            subdomain=Subdomain.INTERVALS,
+            subdomain=Subdomain.INDEX_CONSTITUENTS,
             region=None,
             frequency=None,
         )
 
         # Use typed loading instead of direct file access
         try:
-            df = self.curated_loader.load(
+            df = self.loader.load(
                 dataset_type=membership_type,
                 partitions={"universe": universe, "mode": "intervals"},
             )

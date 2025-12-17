@@ -119,83 +119,42 @@ class OHLCVPanelLoader(BaseLoader):
             frequency=freq_enum,
         )
 
-        # Load data directly from file system (bypass typed_loader due to multi-level partitioning)
-        # OHLCV data is partitioned by exchange, frequency, symbol, and year
-        # We need to scan the file system to find all year directories for each symbol
-        if not symbols:
-            print(
-                "   ⚠️  Cannot load OHLCV data without symbol list (symbol is partition key)"
-            )
-            return pd.DataFrame()
+        # Calculate which years are needed based on date range
+        years = list(range(start_date.year, end_date.year + 1))
 
-        print(f"   Loading {len(symbols)} symbols...")
-
-        from pathlib import Path
-
-        # Build base path: data/curated/market-data/ohlcv/schema_v1/exchange={exchange}/frequency={frequency}
-        contract = self.registry.find(ohlcv_type)
-        base_dir = (
-            Path("data/curated/market-data/ohlcv")
-            / contract.schema_version
-            / f"exchange={exchange}"
-            / f"frequency={frequency}"
-        )
-
-        if not base_dir.exists():
-            print(f"   ⚠️  OHLCV data directory not found: {base_dir}")
-            return pd.DataFrame()
+        # Load each symbol-year combination separately (OHLCV is partitioned by symbol and year)
+        print(f"   Loading {len(symbols)} symbols across {len(years)} year(s)...")
 
         dfs = []
-        errors = 0
-        symbols_found = 0
-
+        symbols_found = set()
         for symbol in symbols:
-            symbol_dir = base_dir / f"symbol={symbol}"
-            if not symbol_dir.exists():
-                errors += 1
-                continue
-
-            # Find all year directories for this symbol
-            year_dirs = list(symbol_dir.glob("year=*"))
-            if not year_dirs:
-                errors += 1
-                continue
-
-            symbols_found += 1
-
-            # Load all parquet files from all years
-            for year_dir in year_dirs:
-                parquet_files = list(year_dir.glob("*.parquet"))
-                for pq_file in parquet_files:
-                    try:
-                        df_year = pd.read_parquet(pq_file)
-                        dfs.append(df_year)
-                    except Exception as e:
-                        if errors <= 5:
-                            print(f"   ⚠️  Error loading {pq_file}: {e}")
-                        errors += 1
+            for year in years:
+                try:
+                    # Load data for each symbol-year combination (both are partition keys)
+                    df_sym_year = self.loader.load(
+                        dataset_type=ohlcv_type,
+                        partitions={
+                            "exchange": exchange,
+                            "frequency": frequency,
+                            "symbol": symbol,
+                            "year": str(year),
+                        },
+                    )
+                    if not df_sym_year.empty:
+                        dfs.append(df_sym_year)
+                        symbols_found.add(symbol)
+                except FileNotFoundError:
+                    # Symbol-year combination not found, skip it
+                    continue
 
         if not dfs:
-            print(
-                f"   ⚠️  No OHLCV data found (found {symbols_found}/{len(symbols)} symbols, {errors} errors)"
-            )
+            print(f"   ⚠️  No OHLCV data found for requested symbols")
             return pd.DataFrame()
 
         df = pd.concat(dfs, ignore_index=True)
 
-        # Deduplicate in case multiple builder runs created duplicate files
-        if not df.empty:
-            if "ingest_ts" in df.columns:
-                df = df.sort_values("ingest_ts", ascending=False)
-            df = df.drop_duplicates(
-                subset=["date", "symbol", "exchange", "frequency"], keep="first"
-            )
-
-        if errors > 0 and errors <= 5:
-            print(f"   ⚠️  {errors} errors during loading")
-
         print(f"✅ Loaded {len(df):,} raw OHLCV records")
-        print(f"   Found {symbols_found}/{len(symbols)} symbols with data")
+        print(f"   Found {len(symbols_found)}/{len(symbols)} symbols with data")
 
         # Ensure date column is datetime
         if "date" not in df.columns:

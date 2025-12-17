@@ -73,7 +73,7 @@ class ContinuousUniverseLoader(BaseLoader):
 
         # Use typed loading instead of direct file access
         try:
-            df = self.curated_loader.load(
+            df = self.loader.load(
                 dataset_type=membership_type,
                 partitions={"universe": universe, "mode": "intervals"},
             )

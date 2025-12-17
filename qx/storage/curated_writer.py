@@ -75,7 +75,7 @@ class CuratedWriter:
             ValueError: If contract not found or data doesn't match schema
         """
         # Resolve contract
-        contract = self.registry.get_contract(dataset_type)
+        contract = self.registry.find(dataset_type)
         if not contract:
             raise ValueError(f"No contract found for {dataset_type}")
 

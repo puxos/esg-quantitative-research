@@ -135,7 +135,7 @@ class ESGPanelLoader(BaseLoader):
         for esg_year in esg_years:
             try:
                 # Use typed loading with filters
-                df_year = self.curated_loader.load(
+                df_year = self.loader.load(
                     dataset_type=esg_type,
                     partitions={"exchange": exchange, "esg_year": str(esg_year)},
                     filters=arrow_filters,

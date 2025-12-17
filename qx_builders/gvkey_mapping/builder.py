@@ -7,17 +7,11 @@ This is metadata that ESG and other builders depend on.
 
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 import pandas as pd
 
-from qx.common.contracts import DatasetContract
 from qx.foundation.base_builder import DataBuilderBase
-from qx.storage.pathing import PathResolver
-from qx.storage.table_format import TableFormatAdapter
-
-if TYPE_CHECKING:
-    from qx.common.contracts import DatasetRegistry
 
 
 def clean_ticker_symbol(ticker: str) -> str:
@@ -71,32 +65,17 @@ class GVKEYMappingBuilder(DataBuilderBase):
     YAML-based initialization only - uses builder.yaml configuration.
     """
 
-    def __init__(
-        self,
-        package_dir: str,
-        registry: "DatasetRegistry",
-        adapter: TableFormatAdapter,
-        resolver: PathResolver,
-        overrides: Optional[dict] = None,
-    ):
+    def __init__(self, package_dir: str, writer, overrides: Optional[dict] = None):
         """
         Initialize GVKEY mapping builder from YAML configuration.
 
         Args:
             package_dir: Path to builder package containing builder.yaml
-            registry: Dataset registry for resolving contracts
-            adapter: Table format adapter for writing curated data
-            resolver: Path resolver for output paths
+            writer: High-level curated data writer
             overrides: Parameter overrides
         """
         # Load YAML configuration
-        super().__init__(
-            package_dir=package_dir,
-            registry=registry,
-            adapter=adapter,
-            resolver=resolver,
-            overrides=overrides,
-        )
+        super().__init__(package_dir=package_dir, writer=writer, overrides=overrides)
 
         # Get raw file path from params (already resolved by base class)
         self.raw_file_path = self.params.get("crsp_file", "./raw/data_mapping.xlsx")
@@ -184,7 +163,7 @@ class GVKEYMappingBuilder(DataBuilderBase):
 
     def build(
         self, partitions: Optional[dict] = None, exchange: Optional[str] = None
-    ) -> str:
+    ) -> dict:
         """
         Build GVKEY mapping data.
 
@@ -193,57 +172,23 @@ class GVKEYMappingBuilder(DataBuilderBase):
             exchange: Exchange code (legacy parameter, overridden by partitions)
 
         Returns:
-            Output path
+            Result dict with status and output info
         """
         # Extract exchange from partitions or use parameter
         partitions = partitions or {}
         exchange_value = partitions.get("exchange", exchange or "US")
 
-        # YAML mode: resolve contract with actual partition values
-        if (
-            self.contract is None
-            and hasattr(self, "registry")
-            and self.registry is not None
-        ):
-            from qx.common.types import DatasetType
+        # Update partitions with final value
+        partitions["exchange"] = exchange_value
 
-            # Create actual output_dt with resolved values
-            actual_dt = DatasetType(
-                domain=self.output_dt_template.domain,
-                asset_class=self.output_dt_template.asset_class,
-                subdomain=self.output_dt_template.subdomain,
-                region=None,
-                frequency=None,
-                dims=self.output_dt_template.dims,
-            )
+        # Call base class build() which handles full pipeline
+        output_path = super().build(partitions=partitions)
 
-            # Find contract for actual dataset type
-            self.contract = self.registry.find(actual_dt)
-            if self.contract is None:
-                raise ValueError(f"No contract found for output type: {actual_dt}")
-
-        print(f"🏗️  Building GVKEY mapping for exchange={exchange_value}")
-
-        # Fetch and transform
-        raw_df = self.fetch_raw()
-        curated = self.transform_to_curated(raw_df)
-
-        if curated.empty:
-            print("⚠️  No mappings to save")
-            return ""
-
-        # Add schema metadata
-        curated = curated.copy()
-        curated["schema_version"] = self.contract.schema_version
-        curated["ingest_ts"] = pd.Timestamp.utcnow()
-
-        # Define partitions (use the exchange value we extracted earlier)
-        write_partitions = {"exchange": exchange_value}
-
-        rel_dir = self.resolver.curated_dir(self.contract, write_partitions)
-        filename = f"part-{datetime.utcnow().strftime('%Y%m%dT%H%M%S')}.parquet"
-
-        output_path = self.adapter.write_batch(curated, rel_dir, filename)
-        print(f"💾 Saved: {output_path} ({len(curated)} rows)")
-
-        return output_path
+        # Return result dict
+        return {
+            "status": "success",
+            "builder": self.info["id"],
+            "version": self.info["version"],
+            "output_path": output_path,
+            "layer": "curated",
+        }

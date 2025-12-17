@@ -1,0 +1,214 @@
+import os
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, Optional
+
+import yaml
+
+from qx.common.contracts import DatasetContract
+
+
+@dataclass
+class PathResolver:
+    """
+    Resolves storage paths for curated and processed data.
+
+    Supports separate read/write modes for environment isolation:
+    - dev: data/dev/curated, data/dev/processed (test data)
+    - prod: data/curated, data/processed (production research data)
+
+    Modes are determined by (highest priority first):
+    1. Explicit read_mode/write_mode parameters
+    2. QX_READ_MODE/QX_WRITE_MODE environment variables
+    3. storage.read_mode/write_mode in config/storage.yaml
+    4. Backward compat: QX_MODE env var or storage.mode (applies to both read/write)
+
+    Usage:
+        # Auto-detect from env/config
+        resolver = PathResolver()
+
+        # Separate read/write modes (recommended for loaders/models)
+        resolver = PathResolver(read_mode="prod", write_mode="dev")
+
+        # Single mode (backward compatible)
+        resolver = PathResolver(mode="prod")
+
+        # Convenience constructors
+        resolver = PathResolver.for_dev()  # Both read and write
+        resolver = PathResolver.for_prod()
+    """
+
+    mode: Optional[str] = None  # Backward compat: single mode for both read/write
+    read_mode: Optional[str] = None  # Mode for reading curated data
+    write_mode: Optional[str] = None  # Mode for writing processed data
+    _config_cache: Optional[Dict] = None
+
+    @classmethod
+    def for_dev(cls) -> "PathResolver":
+        """Create a PathResolver explicitly set to dev mode (both read and write)."""
+        return cls(read_mode="dev", write_mode="dev")
+
+    @classmethod
+    def for_prod(cls) -> "PathResolver":
+        """Create a PathResolver explicitly set to prod mode (both read and write)."""
+        return cls(read_mode="prod", write_mode="prod")
+
+    @property
+    def is_dev(self) -> bool:
+        """Check if resolver is in dev mode (both read and write)."""
+        return self.read_mode == "dev" and self.write_mode == "dev"
+
+    @property
+    def is_prod(self) -> bool:
+        """Check if resolver is in prod mode (both read and write)."""
+        return self.read_mode == "prod" and self.write_mode == "prod"
+    
+    @property
+    def mode(self) -> read/write modes from environment or config if not explicitly set."""
+        config = self._load_config()
+        storage_config = config.get("storage", {})
+        
+        # Initialize read_mode
+        if self.read_mode is None:
+            # Try QX_READ_MODE env var
+            self.read_mode = os.environ.get("QX_READ_MODE")
+            
+            # Try storage.read_mode from config
+            if self.read_mode is None:
+                self.read_mode = storage_config.get("read_mode")
+            
+            # Fall back to single mode (backward compat)
+            if self.read_mode is None:
+                self.read_mode = os.environ.get("QX_MODE") or storage_config.get("mode", "prod")
+        
+        # Initialize write_mode
+        if self.write_mode is None:
+            # Try QX_WRITE_MODE env var
+            self.write_mode = os.environ.get("QX_WRITE_MODE")
+            
+            # Try storage.write_mode from config
+            if self.write_mode is None:
+                self.write_mode = storage_config.get("write_mode")
+            
+            # Fall back to single mode (backward compat)
+            if self.write_mode is None:
+                self.write_mode = os.environ.get("QX_MODE") or storage_config.get("mode", "prod")
+        
+        # Validate modes
+        for mode_name, mode_value in [("read_mode", self.read_mode), ("write_mode", self.write_mode)]:
+            if mode_value not in ("dev", "prod"):
+                raise ValueError(f"Invalid {mode_name} '{mode_valu
+            self.read_mode = value
+            self.write_mode = value
+
+    def __post_init__(self):
+        """Initialize mode from environment or config if not explicitly set."""
+        if self.mode is None:
+            # Try environment variable first
+            self.mode = os.environ.get("QX_MODE")
+
+            # Fall back to config file
+            if self.mode is None:
+                config = self._load_config(), mode: Optional[str] = None) -> str:
+        """
+        Get path prefix based on mode and data type.
+
+        Args:
+            data_type: Either 'curated' or 'processed'
+            mode: Override mode to use (if None, uses read_mode for curated, write_mode for processed)
+
+        Returns:
+            Path prefix (e.g., 'data/dev/curated' or 'data/curated')
+        """
+        # Determine which mode to use
+        if mode is None:
+            mode = self.read_mode if data_type == "curated" else self.write_mode
+        
+        config = self._load_config()
+        paths = config.get("paths", {})
+
+        if g_path.exists():
+            with open(config_path, "r") as f:
+                self._config_cache = yaml.safe_load(f) or {}
+        else:
+            self._config_cache = {}
+
+        return self._config_cache
+
+    def _get_path_prefix(self, data_type: str) -> str:
+        """
+        Get path prefix based on mode and data type.
+
+        Args:
+            data_type: Either 'curated' or 'processed'
+
+        Returns:
+            Path prefix (e.g., 'data/dev/curated' or 'data/curated')
+        """
+        config = self._load_config()
+        paths = config.get("paths", {})
+
+        if self.mode == "dev":
+            return paths.get("dev", {}).get(data_type, f"data/dev/{data_type}")
+        else:  # prod
+        Uses read_mode for reading curated data.
+
+        Args:
+            c: Dataset contract with path template
+            partitions: Partition values to format into path
+
+        Returns:
+            Full path with mode prefix (e.g., 'data/dev/curated/...' or 'data/curated/...')
+        """
+        # Get the base path from contract (e.g., 'data/curated/market-data/ohlcv/...')
+        # Path template may need domain, subdomain from dataset_type
+        template_vars = {
+            "schema_version": c.schema_version,
+            "domain": c.dataset_type.domain.value if c.dataset_type.domain else "",
+            "subdomain": (
+                c.dataset_type.subdomain.value if c.dataset_type.subdomain else ""
+            ),
+            "subtype": c.dataset_type.subtype if c.dataset_type.subtype else "",
+            **partitions,
+        }
+        base_path = c.path_template.format(**template_vars)
+
+        # Replace 'data/curated' with mode-specific prefix (using read_mode)
+        if base_path.startswith("data/curated/"):
+            prefix = self._get_path_prefix("curated", mode=self.read_mode
+        base_path = c.path_template.format(**template_vars)
+
+        # Replace 'data/curated' with mode-specific prefix
+        if base_path.startswith("data/curated/"):
+            prefix = self._get_path_prefix("curated")
+            return base_path.replace("data/curated", prefix, 1)
+
+        return base_path
+
+    def processed_dir(
+        self, output_type: str, model: str, run_date: str, c: DatasetContract
+    ) -> str:
+        """
+        Uses write_mode for writing processed data.
+
+        Args:
+            output_type: Type of processed output
+            model: Model identifier
+            run_date: Run date string
+            c: Dataset contract with path template
+
+        Returns:
+            Full path with mode prefix (e.g., 'data/dev/processed/...' or 'data/processed/...')
+        """
+        # Get the base path from contract
+        base_path = c.path_template.format(
+            output_type=output_type, model=model, run_date=run_date
+        )
+
+        # Replace 'data/processed' with mode-specific prefix (using write_mode)
+        if base_path.startswith("data/processed/"):
+            prefix = self._get_path_prefix("processed", mode=self.write_mode
+            prefix = self._get_path_prefix("processed")
+            return base_path.replace("data/processed", prefix, 1)
+
+        return base_path

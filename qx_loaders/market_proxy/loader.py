@@ -66,6 +66,14 @@ class MarketProxyLoader(BaseLoader):
         Raises:
             ValueError: If no data found for the market proxy symbol
         """
+        from qx.common.types import (
+            AssetClass,
+            DatasetType,
+            Domain,
+            Frequency,
+            Subdomain,
+        )
+
         # Get parameters
         start_date = pd.Timestamp(self.params["start_date"])
         end_date = pd.Timestamp(self.params["end_date"])
@@ -79,55 +87,52 @@ class MarketProxyLoader(BaseLoader):
         print(f"   Frequency: {frequency}")
         print(f"   Exchange: {exchange}")
 
-        # Use frequency string directly (matches storage directory names)
-        freq_str = frequency
+        # Map frequency string to Frequency enum
+        freq_map = {
+            "daily": Frequency.DAILY,
+            "weekly": Frequency.WEEKLY,
+            "monthly": Frequency.MONTHLY,
+        }
+        freq_enum = freq_map.get(frequency.lower(), Frequency.DAILY)
 
-        # Construct the base path for this symbol
-        # Path structure: data/curated/market-data/ohlcv/schema_v1/exchange={exchange}/frequency={freq}/symbol={symbol}/year={year}
-        base_path = f"data/curated/market-data/ohlcv/schema_v1/exchange={exchange}/frequency={freq_str}/symbol={proxy_symbol}"
+        # Define dataset type for OHLCV data
+        ohlcv_type = DatasetType(
+            domain=Domain.MARKET_DATA,
+            asset_class=AssetClass.EQUITY,
+            subdomain=Subdomain.BARS,
+            region=None,
+            frequency=freq_enum,
+        )
 
-        # Load all year partitions for this symbol
-        from pathlib import Path
+        # Calculate which years are needed based on date range
+        years = list(range(start_date.year, end_date.year + 1))
 
-        full_base_path = Path(base_path)
-
-        if not full_base_path.exists():
-            raise ValueError(
-                f"No data found for market proxy '{proxy_symbol}'. "
-                f"Make sure it was included when building OHLCV data (use market_proxy_symbols parameter). "
-                f"Expected path: {full_base_path}"
-            )
-
-        # Find all year directories
-        year_dirs = list(full_base_path.glob("year=*"))
-        if not year_dirs:
-            raise ValueError(
-                f"No year partitions found for '{proxy_symbol}' at {full_base_path}"
-            )
-
-        print(f"✅ Found {len(year_dirs)} year partitions")
-
-        # Load all parquet files from all years
+        # Load each year separately (OHLCV is partitioned by symbol and year)
         dfs = []
-        for year_dir in sorted(year_dirs):
-            parquet_files = list(year_dir.glob("*.parquet"))
-            for pq_file in parquet_files:
-                df_year = pd.read_parquet(pq_file)
-                dfs.append(df_year)
+        for year in years:
+            try:
+                df_year = self.loader.load(
+                    dataset_type=ohlcv_type,
+                    partitions={
+                        "exchange": exchange,
+                        "frequency": frequency,
+                        "symbol": proxy_symbol,
+                        "year": str(year),
+                    },
+                )
+                if not df_year.empty:
+                    dfs.append(df_year)
+            except FileNotFoundError:
+                # Year not available, skip
+                continue
 
         if not dfs:
-            raise ValueError(f"No parquet files found for '{proxy_symbol}'")
-
-        # Concatenate all data
-        df = pd.concat(dfs, ignore_index=True)
-
-        # Deduplicate in case multiple builder runs created duplicate files
-        if not df.empty:
-            if "ingest_ts" in df.columns:
-                df = df.sort_values("ingest_ts", ascending=False)
-            df = df.drop_duplicates(
-                subset=["date", "symbol", "exchange", "frequency"], keep="first"
+            raise ValueError(
+                f"No data found for market proxy '{proxy_symbol}'. "
+                f"Make sure it was included when building OHLCV data (use market_proxy_symbols parameter)."
             )
+
+        df = pd.concat(dfs, ignore_index=True)
 
         print(f"✅ Loaded {len(df):,} raw records for {proxy_symbol}")
 

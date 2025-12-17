@@ -8,6 +8,7 @@ import pandas as pd
 import yaml
 
 from qx.common.contracts import DatasetContract, DatasetRegistry
+from qx.common.env_loader import load_env_file
 from qx.common.enum_validator import (
     EnumValidationError,
     validate_dataset_type_config,
@@ -129,6 +130,9 @@ class DataBuilderBase(abc.ABC):
             writer: High-level curated data writer (contains registry, adapter, resolver)
             overrides: Parameter overrides (e.g., {"symbols": ["AAPL"], "start_date": "2020-01-01"})
         """
+        # Load .env file automatically (idempotent - only loads once)
+        load_env_file()
+        
         # Load builder.yaml from package_dir
         self.package_dir = Path(package_dir)
         yaml_path = self.package_dir / "builder.yaml"

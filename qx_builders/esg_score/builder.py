@@ -13,12 +13,16 @@ import pandas as pd
 from qx.common.ticker_mapper import TickerMapper
 from qx.common.types import AssetClass, DatasetType, Domain, Frequency, Subdomain
 from qx.foundation.base_builder import DataBuilderBase
+from qx.storage.curated_writer import CuratedWriter
 from qx_builders.gvkey_mapping import load_gvkey_mapping_from_curated
 
 
 class ESGScoreBuilder(DataBuilderBase):
     """
-    Builder for ESG scores with GVKEY mapping.
+    SOURCE BUILDER: ESG scores from local Excel/CSV files.
+    
+    External Source: Local data files (data_matlab_ESG_withSIC.xlsx)
+    Authentication: None (local files)
 
     ESG Data Structure:
     - Annual ESG scores (YearESG) published yearly
@@ -33,31 +37,25 @@ class ESGScoreBuilder(DataBuilderBase):
     - Include industry classifications (SIC codes)
     """
 
-    def __init__(self, package_dir, registry, adapter, resolver, overrides=None):
+    def __init__(self, package_dir: str, writer: CuratedWriter, overrides=None):
         """
-        Initialize ESG score builder (YAML mode only).
+        Initialize ESG score builder from YAML configuration.
 
         Args:
-            package_dir: Path to builder package
-            registry: Contract registry
-            adapter: Storage adapter
-            resolver: Path resolver
+            package_dir: Path to builder package containing builder.yaml
+            writer: High-level curated data writer
             overrides: Parameter overrides
 
         Example:
             builder = ESGScoreBuilder(
-                package_dir=Path("qx_builders/esg_score"),
-                registry=registry,
-                adapter=adapter,
-                resolver=resolver,
+                package_dir="qx_builders/esg_score",
+                writer=writer,
                 overrides={"start_year": 2010, "end_year": 2020}
             )
         """
         super().__init__(
             package_dir=package_dir,
-            registry=registry,
-            adapter=adapter,
-            resolver=resolver,
+            writer=writer,
             overrides=overrides,
         )
 
@@ -263,7 +261,7 @@ class ESGScoreBuilder(DataBuilderBase):
 
         return curated
 
-    def build(self, partitions: dict, **kwargs) -> list:
+    def build(self, partitions: dict = None, **kwargs):
         """
         Build ESG scores with auto-partitioning by ESG publication year.
 
@@ -275,7 +273,7 @@ class ESGScoreBuilder(DataBuilderBase):
                                 None = auto-detect
 
         Returns:
-            List of output paths for each ESG year partition
+            Dict with status, output_path, and metadata
 
         Note:
             ESG data has 1-year lag. For calendar period 2014-2024:
@@ -288,27 +286,16 @@ class ESGScoreBuilder(DataBuilderBase):
                 id="BuildESG",
                 run=run_builder(
                     "qx_builders/esg_score",
-                    registry, adapter, resolver,
                     partitions={"exchange": "US"},
                     overrides={"start_year": 2014, "end_year": 2024}  # Calendar years
                     # → Will build ESG years 2013-2023
                 )
             )
         """
-        exchange = partitions.get("exchange", "US")
-
-        # Resolve contract if needed
-        if self.contract is None and self.registry is not None:
-            actual_dt = DatasetType(
-                domain=Domain.ESG,
-                asset_class=AssetClass.EQUITY,
-                subdomain=Subdomain.ESG_SCORES,  # Use proper enum (esg-scores)
-                region=None,
-                frequency=Frequency.YEARLY,
-            )
-            self.contract = self.registry.find(actual_dt)
-            if self.contract is None:
-                raise ValueError(f"No contract found for output type: {actual_dt}")
+        # Extract exchange from partitions or kwargs
+        if partitions is None:
+            partitions = {}
+        exchange = partitions.get("exchange") or kwargs.get("exchange", "US")
 
         # Get year range (these are CALENDAR years from user)
         start_year = kwargs.get("start_year") or self.params.get("start_year")
@@ -354,7 +341,7 @@ class ESGScoreBuilder(DataBuilderBase):
             f"💾 Available ESG years in data: {available_esg_years[0]}-{available_esg_years[-1]}"
         )
 
-        # Build each ESG year
+        # Build each ESG year using writer (handles partitioning automatically)
         output_paths = []
         for esg_year in range(start_esg_year, end_esg_year + 1):
             year_data = curated[curated["esg_year"] == esg_year].copy()
@@ -364,14 +351,16 @@ class ESGScoreBuilder(DataBuilderBase):
                 continue
 
             # Add metadata
-            year_data["schema_version"] = self.contract.schema_version
+            year_data["schema_version"] = self.output_dt_template.frequency or "v1"
             year_data["ingest_ts"] = pd.Timestamp.utcnow()
 
-            # Write partition
+            # Write partition using writer abstraction
             partitions_dict = {"exchange": exchange, "esg_year": str(esg_year)}
-            rel_dir = self.resolver.curated_dir(self.contract, partitions_dict)
-            filename = f"part-{datetime.utcnow().strftime('%Y%m%dT%H%M%S')}.parquet"
-            output_path = self.adapter.write_batch(year_data, rel_dir, filename)
+            output_path = self.writer.write(
+                data=year_data,
+                dataset_type=self.output_dt_template,
+                partitions=partitions_dict
+            )
             output_paths.append(output_path)
 
             print(
@@ -379,4 +368,13 @@ class ESGScoreBuilder(DataBuilderBase):
             )
 
         print(f"\n✅ Built {len(output_paths)} ESG year partitions")
-        return output_paths
+        
+        # Return manifest dict
+        return {
+            "status": "success",
+            "builder": self.info["id"],
+            "version": self.info["version"],
+            "output_path": output_paths[0] if output_paths else None,
+            "rows": sum(len(curated[curated["esg_year"] == y]) for y in range(start_esg_year, end_esg_year + 1)),
+            "layer": "curated"
+        }

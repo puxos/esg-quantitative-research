@@ -65,3 +65,44 @@ schedules:
   weekly_universe_refresh:
     cron: "0 2 * * 6"  # Saturdays at 2 AM UTC
     description: "Weekly universe refresh"
+storage:
+  backend: local
+  base_uri: "file://."
+  table_format: parquet
+  write_mode: append  # File write method: "append" or "overwrite"
+  small_file_compaction_mb: 128
+
+  # Environment modes: dev or prod
+  # - dev: Isolated test environment with smaller datasets (data/dev/*)
+  # - prod: Production research data (data/curated, data/processed)
+
+  # Separate environment modes for read/write (recommended for loaders/models)
+  env_read: prod     # Environment to read curated data from
+  env_write: prod    # Environment to write processed data to
+
+  # Single environment mode (backward compatible)
+  # env: prod  # Uncomment to use single environment for both read and write
+
+# Path configurations for different modes
+paths:
+  dev:
+    curated: "data/dev/curated"
+    processed: "data/dev/processed"
+    raw: "data/dev/raw"  # Optional: smaller test raw data (or use package-local)
+
+  prod:
+    curated: "data/curated"
+    processed: "data/processed"
+    raw: "qx_builders/{builder}/raw"  # Package-local raw data (current structure)
+
+# Mode behavior notes:
+# - Dev mode is for testing, experimentation, and smaller datasets
+# - Prod mode is for full research datasets and publication-ready outputs
+# - Separate read/write modes allow: read prod curated, write dev processed
+# - Packages can override mode in their yaml files (e.g., reference data always uses prod)
+#
+# Priority order (highest to lowest):
+# 1. Explicit mode in code: PathResolver(env_read="prod", env_write="dev")
+# 2. Environment variables: QX_ENV_READ, QX_ENV_WRITE
+# 3. Config file: storage.env_read, storage.env_write
+# 4. Backward compat: QX_MODE env var or storage.env (applies to both)

@@ -14,8 +14,10 @@ import pandas as pd
 from tenacity import retry, stop_after_attempt, wait_exponential
 from tiingo import TiingoClient
 
+from qx.common.env_loader import get_env_var
 from qx.common.ticker_mapper import TickerMapper
 from qx.foundation.base_builder import DataBuilderBase
+from qx.storage.curated_writer import CuratedWriter
 from qx.utils.date_utils import (
     adjust_fetch_dates,
     check_date_coverage,
@@ -25,7 +27,10 @@ from qx.utils.date_utils import (
 
 class TiingoOHLCVBuilder(DataBuilderBase):
     """
-    Builder for equity price data from Tiingo API.
+    SOURCE BUILDER: Equity price data from Tiingo API.
+    
+    External Source: Tiingo REST API
+    Authentication: Requires TIINGO_API_KEY environment variable or tiingo_api_key parameter
 
     Fetches OHLCV data including adjusted prices, dividends, and splits.
     Transforms to curated format with proper partitioning.
@@ -37,9 +42,7 @@ class TiingoOHLCVBuilder(DataBuilderBase):
     def __init__(
         self,
         package_dir: str,
-        registry,
-        adapter,
-        resolver,
+        writer: CuratedWriter,
         overrides: Optional[dict] = None,
     ):
         """
@@ -47,26 +50,24 @@ class TiingoOHLCVBuilder(DataBuilderBase):
 
         Args:
             package_dir: Path to builder package (e.g., "qx_builders/tiingo_ohlcv")
-            registry: Dataset registry for resolving contracts
-            adapter: Table format adapter for writing data
-            resolver: Path resolver for output paths
+            writer: High-level curated data writer
             overrides: Parameter overrides (e.g., {"symbols": ["AAPL"], "start_date": "2020-01-01"})
         """
         # Call parent to load builder.yaml and initialize parameters
+        # (.env file is auto-loaded by base class)
         super().__init__(
             package_dir=package_dir,
-            registry=registry,
-            adapter=adapter,
-            resolver=resolver,
+            writer=writer,
             overrides=overrides,
         )
 
-        # Get API key from params or environment
-        api_key = self.params.get("tiingo_api_key") or os.environ.get("TIINGO_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "Tiingo API key required. Set 'tiingo_api_key' parameter or TIINGO_API_KEY env var"
-            )
+        # Get API key (checks param, then .env, then raises error)
+        api_key = get_env_var(
+            key="TIINGO_API_KEY",
+            param_name="tiingo_api_key",
+            param_value=self.params.get("tiingo_api_key"),
+            required=True
+        )
 
         # Initialize Tiingo client
         self.tiingo = TiingoClient({"api_key": api_key})
