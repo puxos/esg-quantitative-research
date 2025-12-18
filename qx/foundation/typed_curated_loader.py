@@ -103,24 +103,31 @@ class TypedCuratedLoader:
         contract = self.registry.find(dataset_type)
 
         # Build storage path from contract + partitions
+        # May contain wildcards (*) for missing partition keys
         partitions = partitions or {}
         base_dir = self.resolver.curated_dir(contract, partitions)
 
-        # Find all parquet files in the partition directory
-        # base_dir is already relative to backend.root from resolver
-        base_path = self.backend.root / base_dir
-        if not base_path.exists():
-            raise FileNotFoundError(
-                f"No data found for dataset type {dataset_type} at {base_path}. "
-                f"Partitions: {partitions}"
-            )
+        # Find all parquet files (handle wildcards in path)
+        if "*" in base_dir:
+            # Wildcard path - use glob from root to find matching files
+            parquet_files = list(self.backend.root.glob(f"{base_dir}/*.parquet"))
+            if not parquet_files:
+                # Try recursive glob for nested partitions
+                parquet_files = list(self.backend.root.glob(f"{base_dir}/**/*.parquet"))
+        else:
+            # Exact path - check if exists
+            base_path = self.backend.root / base_dir
+            if not base_path.exists():
+                raise FileNotFoundError(
+                    f"No data found for dataset type {dataset_type} at {base_path}. "
+                    f"Partitions: {partitions}"
+                )
+            parquet_files = list(base_path.glob("*.parquet"))
 
-        # Read all parquet files in the partition
-        parquet_files = list(base_path.glob("*.parquet"))
         if not parquet_files:
             raise FileNotFoundError(
-                f"No parquet files found for dataset type {dataset_type} at {base_path}. "
-                f"Partitions: {partitions}"
+                f"No parquet files found for dataset type {dataset_type}. "
+                f"Path pattern: {base_dir}, Partitions: {partitions}"
             )
 
         # Load and concatenate all files

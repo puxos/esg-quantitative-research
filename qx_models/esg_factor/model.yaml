@@ -31,9 +31,9 @@ io:
         domain: market-data
         asset_class: equity
         subdomain: bars
-        region: US
-        frequency: monthly
-      description: "Monthly OHLCV price data (resampled from daily)"
+        region: null
+        frequency: null
+      description: "Monthly OHLCV price data (specify region and frequency in partitions)"
 
     # Input 2: ESG scores (curated)
     - name: esg_scores
@@ -53,16 +53,16 @@ io:
         domain: reference-rates
         asset_class: fixed-income
         subdomain: yield-curves
-        region: US
-        frequency: monthly
-      description: "Monthly risk-free rates (resampled from daily)"
+        region: null
+        frequency: null
+      description: "Monthly risk-free rates (specify region and frequency in partitions)"
     # Input 4: Universe filter (optional processed)
     - name: universe_filter
       required: false
       type:
         domain: derived-metrics
         asset_class: equity
-        subdomain: universe_filter
+        subdomain: models # Using generic 'models' subdomain for now
         region: null
         frequency: null
       description: |

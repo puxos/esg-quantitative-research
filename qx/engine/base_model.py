@@ -42,9 +42,23 @@ class BaseModel(abc.ABC):
         self.constraints = cfg.get("constraints", {})
 
     def _resolve_inputs(
-        self, available_types: List[DatasetType]
+        self,
+        available_types: List[DatasetType],
+        partitions_by_input: Dict[str, Dict[str, str]] = None,
     ) -> Dict[str, DatasetContract]:
+        """
+        Resolve input contracts from available dataset types.
+
+        Args:
+            available_types: Types emitted by loaders (may have None for frequency/region)
+            partitions_by_input: Partition values to refine types for registry lookup
+
+        Returns:
+            Dict mapping input name to resolved contract
+        """
         resolved = {}
+        partitions_by_input = partitions_by_input or {}
+
         for inp in self.inputs_cfg:
             name = inp["name"]
             pattern = dataset_type_from_config(inp["type"])
@@ -72,7 +86,50 @@ class BaseModel(abc.ABC):
             if inp.get("required", True) and not match:
                 raise ValueError(f"Missing required input '{name}' type {pattern}")
             if match:
-                resolved[name] = self.registry.find(match[0])
+                matched_type = match[0]
+
+                # Refine matched type with partition values for registry lookup
+                partitions = partitions_by_input.get(name, {})
+                if partitions:
+                    # Apply partition values to create specific type for registry
+                    from qx.common.types import Frequency, Region
+
+                    # Convert partition string values to enums
+                    # Note: "exchange" is a partition key but NOT a DatasetType field
+                    # Only apply "region" from partitions to the DatasetType
+                    region = None
+                    if "region" in partitions:
+                        region_val = partitions["region"]
+                        if isinstance(region_val, str):
+                            region = Region[region_val.upper().replace("-", "_")]
+                        else:
+                            region = region_val
+                    # "exchange" is NOT mapped to region - it's only a partition key
+
+                    frequency = None
+                    if "frequency" in partitions:
+                        freq_val = partitions["frequency"]
+                        if isinstance(freq_val, str):
+                            frequency = Frequency[freq_val.upper().replace("-", "_")]
+                        else:
+                            frequency = freq_val
+
+                    refined_type = DatasetType(
+                        domain=matched_type.domain,
+                        asset_class=matched_type.asset_class,
+                        subdomain=matched_type.subdomain,
+                        subtype=matched_type.subtype,
+                        region=region if region is not None else matched_type.region,
+                        frequency=(
+                            frequency
+                            if frequency is not None
+                            else matched_type.frequency
+                        ),
+                    )
+                    matched_type = refined_type
+
+                # Use pattern matching to find contract (handles None values)
+                resolved[name] = self.registry.find_matching(matched_type)
         return resolved
 
     @abc.abstractmethod
@@ -86,7 +143,7 @@ class BaseModel(abc.ABC):
         partitions_by_input: Dict[str, Dict[str, str]],
         **kwargs,
     ) -> pd.DataFrame:
-        contracts_by_name = self._resolve_inputs(available_types)
+        contracts_by_name = self._resolve_inputs(available_types, partitions_by_input)
         inputs_df = {
             name: self.loader.load(c.dataset_type, partitions_by_input.get(name, {}))
             for name, c in contracts_by_name.items()

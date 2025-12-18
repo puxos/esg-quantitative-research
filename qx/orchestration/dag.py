@@ -23,6 +23,11 @@ class DAG:
         for task_id, task in self.tasks.items():
             if hasattr(task.run, "output_types"):
                 task.outputs = task.run.output_types
+                # Debug: Log extracted types
+                type_source = getattr(task.run, "type_source", "produced")
+                print(
+                    f"[DAG] Extracted {len(task.outputs)} type(s) from {task_id} ({type_source})"
+                )
 
     def get_available_types_for_task(self, task_id: str) -> List[DatasetType]:
         """
@@ -41,6 +46,9 @@ class DAG:
         available = []
         for dep_id in task.deps:
             dep_task = self.tasks.get(dep_id)
+            print(
+                f"[DAG] Checking dep '{dep_id}': outputs={len(dep_task.outputs) if dep_task and dep_task.outputs else 0}"
+            )
             if dep_task and dep_task.outputs:
                 available.extend(dep_task.outputs)
 

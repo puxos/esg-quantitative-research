@@ -162,6 +162,7 @@ class PathResolver:
 
         Returns:
             Full path with mode prefix (e.g., 'data/dev/curated/...' or 'data/curated/...')
+            Path may contain wildcards (*) for missing partition keys (used for aggregated reads)
         """
         # Get the base path from contract (e.g., 'data/curated/market-data/ohlcv/...')
         # Path template may need domain, subdomain from dataset_type
@@ -172,8 +173,17 @@ class PathResolver:
                 c.dataset_type.subdomain.value if c.dataset_type.subdomain else ""
             ),
             "subtype": c.dataset_type.subtype if c.dataset_type.subtype else "",
-            **partitions,
         }
+
+        # Add provided partitions
+        template_vars.update(partitions)
+
+        # For missing partition keys in template, use wildcard '*'
+        # This enables aggregated reads across multiple partition values
+        for key in c.partition_keys:
+            if key not in template_vars:
+                template_vars[key] = "*"
+
         base_path = c.path_template.format(**template_vars)
 
         # Replace 'data/curated' with environment-specific prefix (using env_read)

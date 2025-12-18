@@ -204,6 +204,27 @@ def run_loader(
         task_callable.input_requirements = input_requirements
         task_callable._loader_package_path = package_path
 
+    # ENHANCEMENT: Loaders emit verified dataset types
+    # Extract dataset types from loader's inputs - these represent datasets
+    # the loader verifies as existing (by successfully reading them)
+    verified_types = []
+
+    # Support both "inputs" (old) and "io.inputs" (new) YAML structures
+    inputs_list = loader_config.get("inputs", [])
+    if not inputs_list and "io" in loader_config:
+        inputs_list = loader_config["io"].get("inputs", [])
+
+    for inp in inputs_list:
+        # Loader YAML uses "type" key, not "dataset_type"
+        if "type" in inp:
+            dataset_type = dataset_type_from_config(inp["type"])
+            verified_types.append(dataset_type)
+
+    # Attach verified types so DAG can collect them for models
+    if verified_types:
+        task_callable.output_types = verified_types
+        task_callable.type_source = "verified"  # vs "produced" for builders
+
     return task_callable
 
 
@@ -267,6 +288,35 @@ def run_builder(
         builder_config = yaml.safe_load(f)
 
     output_type = dataset_type_from_config(builder_config["io"]["output"]["type"])
+
+    # Merge partition values into output type (e.g., frequency from partitions)
+    if partitions:
+        # Create a new DatasetType with partition values merged
+        updated_fields = {}
+
+        # Map partition keys to DatasetType fields
+        if "frequency" in partitions and output_type.frequency is None:
+            # Convert frequency string to Frequency enum
+            freq_str = partitions["frequency"]
+            freq_enum = Frequency[freq_str.upper()] if freq_str else None
+            updated_fields["frequency"] = freq_enum
+
+        if "region" in partitions and output_type.region is None:
+            # Convert region string to Region enum
+            region_str = partitions["region"]
+            region_enum = Region[region_str.upper()] if region_str else None
+            updated_fields["region"] = region_enum
+
+        # Create new DatasetType with merged fields
+        if updated_fields:
+            output_type = DatasetType(
+                domain=output_type.domain,
+                asset_class=output_type.asset_class,
+                subdomain=output_type.subdomain,
+                subtype=output_type.subtype,
+                region=updated_fields.get("region", output_type.region),
+                frequency=updated_fields.get("frequency", output_type.frequency),
+            )
 
     # Check if builder has curated data inputs
     input_requirements = []

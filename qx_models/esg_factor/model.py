@@ -216,10 +216,20 @@ class ESGFactorModel(BaseModel):
 
         # Combine all factors
         logger.info("\n🔗 Combining factors...")
+        if not factors:
+            raise ValueError(
+                "No factors were generated - check data availability and alignment"
+            )
+
         result_df = pd.concat(factors, ignore_index=True)
 
         # Drop any NaN rows
         result_df = result_df.dropna()
+
+        if result_df.empty:
+            raise ValueError(
+                "All factor returns are NaN - check data alignment and date ranges"
+            )
 
         logger.info(
             f"✅ Built {result_df['factor_name'].nunique()} factors with {len(result_df)} observations"
@@ -335,10 +345,10 @@ class ESGFactorModel(BaseModel):
         """Prepare ESG scores for factor construction"""
         esg = esg_df.copy()
 
-        # Ensure required columns
+        # Ensure required columns (use 'year' for annual ESG data)
         required_cols = [
-            "date",
             "ticker",
+            "year",
             "esg_score",
             "environmental_pillar_score",
             "social_pillar_score",
@@ -352,8 +362,9 @@ class ESGFactorModel(BaseModel):
         if "ticker" in esg.columns and "symbol" not in esg.columns:
             esg = esg.rename(columns={"ticker": "symbol"})
 
-        # Ensure date is datetime
-        esg["date"] = pd.to_datetime(esg["date"])
+        # Convert year to date (first day of year)
+        # Year column represents when ESG data becomes available (esg_year + 1)
+        esg["date"] = pd.to_datetime(esg["year"].astype(str) + "-01-01")
 
         # Create MultiIndex
         esg = esg.set_index(["date", "symbol"]).sort_index()
