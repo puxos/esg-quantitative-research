@@ -24,10 +24,9 @@ model:
       - Cross-sectional (one beta per stock) if window=null
       - Time-series (rolling betas) if window specified
 
-io:
-  inputs:
-    # Input 1: Stock prices (for individual stock returns)
-    - name: equity_prices
+inputs:
+  # Input 1: Stock prices (for individual stock returns)
+  - name: equity_prices
       required: true
       type:
         domain: market-data
@@ -70,9 +69,9 @@ io:
         frequency: monthly
       description: "Monthly risk-free rates"
 
-  output:
-    type:
-      domain: derived-metrics
+output:
+  type:
+    domain: derived-metrics
       asset_class: equity
       subdomain: factor-exposures
       subtype: market-esg-regression

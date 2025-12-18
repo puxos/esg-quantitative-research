@@ -4,36 +4,36 @@ model:
   featureset_id: ohlcv_v1+rf_v1
   description: "CAPM expected return using daily OHLCV and daily risk-free"
 
-io:
-  inputs:
-    - name: equity_prices
-      required: true
-      type:
-        domain: market-data
-        asset_class: equity
-        subdomain: bars
-        subtype: null
-        region: null
-        frequency: null  # Accept any frequency (will be resampled to target frequency)
-      description: "OHLCV price data (will be resampled to monthly if needed)"
-    - name: risk_free
-      required: true
-      type:
-        domain: reference-rates
-        asset_class: fixed-income
-        subdomain: yield-curves
-        subtype: null
-        region: null
-        frequency: null  # Accept any frequency (will be resampled to target frequency)
-      description: "Risk-free rates (will be resampled to monthly if needed for excess returns)"
-  output:
+inputs:
+  - name: equity_prices
+    required: true
     type:
-      domain: derived-metrics
+      domain: market-data
       asset_class: equity
-      subdomain: expected-returns
-      subtype: capm
+      subdomain: bars
+      subtype: null
       region: null
-      frequency: monthly
+      frequency: null # Accept any frequency (will be resampled to target frequency)
+    description: "OHLCV price data (will be resampled to monthly if needed)"
+  - name: risk_free
+    required: true
+    type:
+      domain: reference-rates
+      asset_class: fixed-income
+      subdomain: yield-curves
+      subtype: null
+      region: null
+      frequency: null # Accept any frequency (will be resampled to target frequency)
+    description: "Risk-free rates (will be resampled to monthly if needed for excess returns)"
+
+output:
+  type:
+    domain: derived-metrics
+    asset_class: equity
+    subdomain: expected-returns
+    subtype: capm
+    region: null
+    frequency: monthly
 
 parameters:
   horizon_d:

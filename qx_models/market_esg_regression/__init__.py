@@ -6,6 +6,6 @@ Performs OLS regression to estimate factor exposures (market beta and ESG beta):
 """
 
 from .model import MarketESGRegressionModel
-from .schema import get_market_esg_betas_contract
+from .schema import get_market_esg_regression_contract
 
-__all__ = ["MarketESGRegressionModel", "get_market_esg_betas_contract"]
+__all__ = ["MarketESGRegressionModel", "get_market_esg_regression_contract"]

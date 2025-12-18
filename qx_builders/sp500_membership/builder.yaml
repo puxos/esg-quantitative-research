@@ -3,14 +3,13 @@ builder:
   version: 1.0.0
   description: "S&P 500 historical membership builder - transforms raw CSV into curated daily membership data"
 
-io:
-  output:
-    type:
-      domain: instrument-reference
-      asset_class: null
-      subdomain: index-constituents
-      region: null
-      frequency: null
+output:
+  type:
+    domain: instrument-reference
+    asset_class: null
+    subdomain: index-constituents
+    region: null
+    frequency: null
 
 parameters:
   min_date:

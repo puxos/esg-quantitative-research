@@ -3,13 +3,12 @@ builder:
   version: 1.0.0
   description: "GVKEY-ticker mapping builder - creates mapping from GVKEY identifiers to ticker symbols"
 
-io:
-  output:
-    type:
-      domain: instrument-reference
-      asset_class: null
-      subdomain: identifiers
-      frequency: null
+output:
+  type:
+    domain: instrument-reference
+    asset_class: null
+    subdomain: identifiers
+    frequency: null
 
 parameters:
   exchange:

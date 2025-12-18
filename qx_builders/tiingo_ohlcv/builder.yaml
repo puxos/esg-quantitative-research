@@ -3,13 +3,12 @@ builder:
   version: 1.0.0
   description: "Tiingo OHLCV price data builder - fetches equity price data from Tiingo API"
 
-io:
-  output:
-    type:
-      domain: market-data
-      asset_class: equity
-      subdomain: bars
-      frequency: null  # Partitioned separately
+output:
+  type:
+    domain: market-data
+    asset_class: equity
+    subdomain: bars
+    frequency: null # Partitioned separately
 
 parameters:
   # Required parameters (no defaults)

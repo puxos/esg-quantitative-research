@@ -48,23 +48,19 @@ def validate_builder_yaml(yaml_path: Path) -> bool:
         builder = config["builder"]
         print(f"✅ Builder: {builder.get('id')} v{builder.get('version')}")
 
-        # Validate io section
-        if "io" not in config:
-            print("❌ Missing 'io' section")
+        # Validate output section (top-level)
+        if "output" not in config:
+            print("❌ Missing 'output' section")
             return False
 
-        io = config["io"]
+        output = config["output"]
 
         # Validate output type
-        if "output" not in io:
-            print("❌ Missing 'io.output' section")
+        if "type" not in output:
+            print("❌ Missing 'output.type' section")
             return False
 
-        if "type" not in io["output"]:
-            print("❌ Missing 'io.output.type' section")
-            return False
-
-        output_type = io["output"]["type"]
+        output_type = output["type"]
         print(f"\n📊 Output Type:")
         print(f"   domain: {output_type.get('domain')}")
         print(f"   asset_class: {output_type.get('asset_class')}")

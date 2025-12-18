@@ -36,8 +36,8 @@ class BaseModel(abc.ABC):
         self.writer = writer
         self.registry = loader.registry
         self.info = cfg["model"]
-        self.inputs_cfg = cfg["io"]["inputs"]
-        self.output_dt = dataset_type_from_config(cfg["io"]["output"]["type"])
+        self.inputs_cfg = cfg["inputs"]
+        self.output_dt = dataset_type_from_config(cfg["output"]["type"])
         self.params = resolve_parameters(cfg.get("parameters", {}), overrides)
         self.constraints = cfg.get("constraints", {})
 

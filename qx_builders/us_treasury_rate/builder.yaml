@@ -9,14 +9,13 @@ builder:
     Supports multiple maturities (3-month through 30-year) with batch processing.
 
 # Input/Output specification
-io:
-  output:
-    type:
-      domain: reference-rates
-      asset_class: fixed-income
-      subdomain: yield-curves
-      region: US  # Hardcoded: US-specific (FRED API)
-      frequency: null  # Partitioned (daily/weekly/monthly)
+output:
+  type:
+    domain: reference-rates
+    asset_class: fixed-income
+    subdomain: yield-curves
+    region: US # Hardcoded: US-specific (FRED API)
+    frequency: null # Partitioned (daily/weekly/monthly)
 
 # Builder parameters
 parameters:
@@ -31,7 +30,7 @@ parameters:
   end_date:
     type: string
     required: false
-    default: null  # null = today
+    default: null # null = today
     description: End date for data fetch (YYYY-MM-DD), null for today
     example: "2024-12-31"
 
@@ -127,4 +126,3 @@ metadata:
       - Builder fetches all specified rate_types in one run
       - Auto-partitions by rate_type during write
       - Efficient for building complete rate curves
-

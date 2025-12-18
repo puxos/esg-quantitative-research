@@ -10,14 +10,13 @@ builder:
     Supports batch processing by year range.
 
 # Input/Output specification
-io:
-  output:
-    type:
-      domain: esg
-      asset_class: equity
-      subdomain: esg-scores
-      region: null
-      frequency: yearly  # ESG scores are annual (one record per company per year)
+output:
+  type:
+    domain: esg
+    asset_class: equity
+    subdomain: esg-scores
+    region: null
+    frequency: yearly # ESG scores are annual (one record per company per year)
 
 # Builder parameters
 parameters:

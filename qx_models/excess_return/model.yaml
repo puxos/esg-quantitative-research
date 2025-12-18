@@ -4,54 +4,53 @@ model:
   featureset_id: ohlcv_v1+rf_v1
   description: |
     Calculate excess returns from OHLCV price data over various frequencies.
-    
+
     Return Calculation:
     - Resamples OHLCV data to specified frequency (weekly, monthly, quarterly, yearly)
     - Calculates simple returns: (close_t - close_t-1) / close_t-1
     - Optionally subtracts risk-free rate to get excess returns
-    
+
     Output:
     - DataFrame with date, symbol, return, frequency columns
     - Can be used for performance analysis, factor models, portfolio construction
 
-io:
-  inputs:
-    # Input 1: Price data (curated) - for returns calculation
-    - name: equity_prices
-      required: true
-      type:
-        domain: market-data
-        asset_class: equity
-        subdomain: bars
-        region: US
-        frequency: monthly
-      description: "Monthly OHLCV price data (will be resampled to target frequency)"
-
-    # Input 2: Risk-free rate (curated) - optional for excess returns
-    - name: risk_free
-      required: false
-      type:
-        domain: reference-rates
-        asset_class: fixed-income
-        subdomain: yield-curves
-        region: US
-        frequency: monthly
-      description: "Monthly risk-free rates (will be resampled to target frequency for excess returns)"
-
-  output:
+inputs:
+  # Input 1: Price data (curated) - for returns calculation
+  - name: equity_prices
+    required: true
     type:
-      domain: derived-metrics
+      domain: market-data
       asset_class: equity
-      subdomain: factors
-      region: null
-      frequency: null
-    description: |
-      Returns dataset with columns: date, symbol, return, frequency
-      
-      - date: Period end date
-      - symbol: Ticker symbol
-      - return: Simple return or excess return (if risk_free provided)
-      - frequency: Frequency of returns (weekly, monthly, quarterly, yearly)
+      subdomain: bars
+      region: US
+      frequency: monthly
+    description: "Monthly OHLCV price data (will be resampled to target frequency)"
+
+  # Input 2: Risk-free rate (curated) - optional for excess returns
+  - name: risk_free
+    required: false
+    type:
+      domain: reference-rates
+      asset_class: fixed-income
+      subdomain: yield-curves
+      region: US
+      frequency: monthly
+    description: "Monthly risk-free rates (will be resampled to target frequency for excess returns)"
+
+output:
+  type:
+    domain: derived-metrics
+    asset_class: equity
+    subdomain: factors
+    region: null
+    frequency: null
+  description: |
+    Returns dataset with columns: date, symbol, return, frequency
+
+    - date: Period end date
+    - symbol: Ticker symbol
+    - return: Simple return or excess return (if risk_free provided)
+    - frequency: Frequency of returns (weekly, monthly, quarterly, yearly)
 
 parameters:
   frequency:

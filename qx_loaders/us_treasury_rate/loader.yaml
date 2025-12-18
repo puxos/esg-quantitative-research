@@ -9,16 +9,15 @@ loader:
   version: 1.0.0
   description: "Load US Treasury rates (risk-free rates) for financial models"
 
-io:
-  inputs:
-    - name: treasury_rate_data
-      required: true
-      type:
-        domain: reference-rates
-        asset_class: fixed-income
-        subdomain: yield-curves
-        region: US
-        frequency: null  # Will be specified via parameters
+inputs:
+  - name: treasury_rate_data
+    required: true
+    type:
+      domain: reference-rates
+      asset_class: fixed-income
+      subdomain: yield-curves
+      region: US
+      frequency: null # Will be specified via parameters
 
 parameters:
   start_date:
@@ -73,7 +72,7 @@ output:
 
   # Validation rules
   validation:
-    allow_empty: false  # Must have rate data for specified period
+    allow_empty: false # Must have rate data for specified period
     required_columns: ["date", "rate_type", "rate"]
     min_rows: 1
 

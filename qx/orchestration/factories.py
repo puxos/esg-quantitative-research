@@ -209,10 +209,8 @@ def run_loader(
     # the loader verifies as existing (by successfully reading them)
     verified_types = []
 
-    # Support both "inputs" (old) and "io.inputs" (new) YAML structures
+    # Extract inputs from top-level
     inputs_list = loader_config.get("inputs", [])
-    if not inputs_list and "io" in loader_config:
-        inputs_list = loader_config["io"].get("inputs", [])
 
     for inp in inputs_list:
         # Loader YAML uses "type" key, not "dataset_type"
@@ -287,7 +285,7 @@ def run_builder(
     with open(builder_yaml, "r") as f:
         builder_config = yaml.safe_load(f)
 
-    output_type = dataset_type_from_config(builder_config["io"]["output"]["type"])
+    output_type = dataset_type_from_config(builder_config["output"]["type"])
 
     # Merge partition values into output type (e.g., frequency from partitions)
     if partitions:
@@ -318,10 +316,10 @@ def run_builder(
                 frequency=updated_fields.get("frequency", output_type.frequency),
             )
 
-    # Check if builder has curated data inputs
+    # Check if builder has curated data inputs (TRANSFORM builders)
     input_requirements = []
-    if "inputs" in builder_config.get("io", {}):
-        for inp in builder_config["io"]["inputs"]:
+    if "inputs" in builder_config:
+        for inp in builder_config["inputs"]:
             input_requirements.append(
                 {
                     "name": inp["name"],
@@ -468,7 +466,7 @@ def run_model(
     with open(model_yaml, "r") as f:
         model_config = yaml.safe_load(f)
 
-    output_type = dataset_type_from_config(model_config["io"]["output"]["type"])
+    output_type = dataset_type_from_config(model_config["output"]["type"])
 
     # Extract input requirements for DAG validation
     input_requirements = [
@@ -478,7 +476,7 @@ def run_model(
             "required": inp.get("required", True),
             "description": inp.get("description", ""),
         }
-        for inp in model_config["io"].get("inputs", [])
+        for inp in model_config.get("inputs", [])
     ]
 
     def task_callable(available_types: List[DatasetType]) -> Dict:

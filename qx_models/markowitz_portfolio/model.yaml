@@ -31,103 +31,102 @@ model:
         - Ledoit & Wolf (2003): "Improved estimation of the covariance matrix"
         - Pastor, Stambaugh & Taylor (2021): "Sustainable investing in equilibrium"
 
-io:
-  inputs:
-    # Expected returns from factor model
-    - name: expected_returns
-      required: true
-      type:
-        domain: derived-metrics
-        asset_class: equity
-        subdomain: expected-returns
-        subtype: null
-        region: null
-        frequency: monthly
-      description: |
-        Expected returns from CAPM model.
-        Used as μ in mean-variance optimization objective.
-
-        Must contain: symbol, date, ER_monthly
-
-    # Two-factor betas (for ESG exposure constraint)
-    - name: two_factor_betas
-      required: true
-      type:
-        domain: derived-metrics
-        asset_class: equity
-        subdomain: factor-exposures
-        subtype: null
-        region: null
-        frequency: null
-      description: |
-        Factor betas from two_factor_regression model.
-        ESG beta (β_ESG) used for ESG exposure constraint: L ≤ β'w ≤ U
-
-        Must contain: symbol, beta_esg
-
-    # Historical prices (for covariance estimation)
-    - name: equity_prices
-      required: true
-      type:
-        domain: market-data
-        asset_class: equity
-        subdomain: ohlcv
-        subtype: null
-        region: US
-        frequency: daily
-      description: |
-        Historical equity prices for covariance estimation.
-        Resampled to monthly frequency and used to build Σ matrix.
-
-        Lookback period controlled by lookback_months parameter.
-
-    # Risk-free rate (for excess returns in covariance)
-    - name: risk_free
-      required: true
-      type:
-        domain: reference-rates
-        asset_class: fixed-income
-        subdomain: yield-curves
-        region: US
-        frequency: monthly
-      description: |
-        Risk-free rate for calculating excess returns.
-        Used in covariance estimation (excess return covariance).
-
-    # Sector metadata (optional, for sector constraints)
-    - name: sector_mapping
-      required: false
-      type:
-        domain: metadata
-        asset_class: equity
-        subdomain: sectors
-        region: null
-        frequency: null
-      description: |
-        GICS sector mapping (ticker → sector).
-        Required only if sector_constraints=true.
-
-        If not provided, sector constraints will be skipped.
-
-  output:
+inputs:
+  # Expected returns from factor model
+  - name: expected_returns
+    required: true
     type:
       domain: derived-metrics
       asset_class: equity
-      subdomain: positions
+      subdomain: expected-returns
+      subtype: null
+      region: null
+      frequency: monthly
+    description: |
+      Expected returns from CAPM model.
+      Used as μ in mean-variance optimization objective.
+
+      Must contain: symbol, date, ER_monthly
+
+  # Two-factor betas (for ESG exposure constraint)
+  - name: two_factor_betas
+    required: true
+    type:
+      domain: derived-metrics
+      asset_class: equity
+      subdomain: factor-exposures
+      subtype: null
       region: null
       frequency: null
     description: |
-      Optimal portfolio weights from mean-variance optimization.
+      Factor betas from two_factor_regression model.
+      ESG beta (β_ESG) used for ESG exposure constraint: L ≤ β'w ≤ U
 
-      Contains:
-        - Identifiers: symbol, optimization_date
-        - Weights: weight (portfolio allocation)
-        - Expected returns: exp_return_monthly
-        - Risk metrics: esg_beta, sector
-        - Portfolio stats: portfolio_return, portfolio_vol, portfolio_sharpe, portfolio_esg_exposure
-        - Metadata: model, model_version, featureset_id, run_id, run_ts
+      Must contain: symbol, beta_esg
 
-      Output frequency: As-requested (typically monthly rebalancing)
+  # Historical prices (for covariance estimation)
+  - name: equity_prices
+    required: true
+    type:
+      domain: market-data
+      asset_class: equity
+      subdomain: ohlcv
+      subtype: null
+      region: US
+      frequency: daily
+    description: |
+      Historical equity prices for covariance estimation.
+      Resampled to monthly frequency and used to build Σ matrix.
+
+      Lookback period controlled by lookback_months parameter.
+
+  # Risk-free rate (for excess returns in covariance)
+  - name: risk_free
+    required: true
+    type:
+      domain: reference-rates
+      asset_class: fixed-income
+      subdomain: yield-curves
+      region: US
+      frequency: monthly
+    description: |
+      Risk-free rate for calculating excess returns.
+      Used in covariance estimation (excess return covariance).
+
+  # Sector metadata (optional, for sector constraints)
+  - name: sector_mapping
+    required: false
+    type:
+      domain: metadata
+      asset_class: equity
+      subdomain: sectors
+      region: null
+      frequency: null
+    description: |
+      GICS sector mapping (ticker → sector).
+      Required only if sector_constraints=true.
+
+      If not provided, sector constraints will be skipped.
+
+output:
+  type:
+    domain: derived-metrics
+    asset_class: equity
+    subdomain: positions
+    region: null
+    frequency: null
+  description: |
+    Optimal portfolio weights from mean-variance optimization.
+
+    Contains:
+      - Identifiers: symbol, optimization_date
+      - Weights: weight (portfolio allocation)
+      - Expected returns: exp_return_monthly
+      - Risk metrics: esg_beta, sector
+      - Portfolio stats: portfolio_return, portfolio_vol, portfolio_sharpe, portfolio_esg_exposure
+      - Metadata: model, model_version, featureset_id, run_id, run_ts
+
+    Output frequency: As-requested (typically monthly rebalancing)
 
 parameters:
   # Risk aversion (mean-variance tradeoff)

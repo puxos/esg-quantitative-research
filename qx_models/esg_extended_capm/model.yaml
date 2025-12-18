@@ -26,92 +26,91 @@ model:
         - Pastor, Stambaugh & Taylor (2021): "Sustainable investing in equilibrium"
         - Newey & West (1994): "Automatic lag selection in covariance matrix estimation"
 
-io:
-  inputs:
-    # Two-factor betas (market and ESG exposures from regression)
-    - name: market_esg_betas
-      required: true
-      type:
-        domain: derived-metrics
-        asset_class: equity
-        subdomain: factor-exposures
-        subtype: null
-        region: null
-        frequency: monthly
-      description: |
-        Pre-computed factor betas from two_factor_regression model.
-        Contains: symbol, date, beta_market, beta_esg
-
-        If using latest betas (constant across time):
-          - One row per symbol (latest estimate)
-          - Applied to all forecast dates
-
-        If using time-varying betas (rolling window):
-          - Multiple rows per symbol (time-series)
-          - Most recent beta used for each forecast date
-
-    # Market prices (SPY as market proxy)
-    - name: market_prices
-      required: true
-      type:
-        domain: market-data
-        asset_class: equity
-        subdomain: bars
-        subtype: null
-        region: US
-        frequency: monthly
-      description: |
-        Market portfolio proxy (SPY) for calculating market excess returns.
-        Used to estimate market risk premium (λ_market) via HAC-robust mean.
-
-    # Risk-free rate (US Treasury rates)
-    - name: risk_free
-      required: true
-      type:
-        domain: reference-rates
-        asset_class: fixed-income
-        subdomain: yield-curves
-        subtype: null
-        region: US
-        frequency: monthly
-      description: |
-        Risk-free rate time-series (US Treasury rates).
-        Resampled to monthly frequency for expected return calculations.
-
-    # ESG factors (ESG factor returns for estimating ESG premium)
-    - name: esg_factors
-      required: true
-      type:
-        domain: derived-metrics
-        asset_class: equity
-        subdomain: factors
-        region: null
-        frequency: monthly
-      description: |
-        ESG factor returns from esg_factor model.
-        Used to estimate ESG risk premium (λ_ESG) via HAC-robust mean.
-        Typically uses "ESG" factor (composite), but can use E, S, G, or ESG_mom.
-
-  output:
+inputs:
+  # Two-factor betas (market and ESG exposures from regression)
+  - name: market_esg_betas
+    required: true
     type:
       domain: derived-metrics
       asset_class: equity
-      subdomain: models
-      subtype: capm
+      subdomain: factor-exposures
+      subtype: null
       region: null
       frequency: monthly
     description: |
-      Expected returns for each stock at each forecast date.
+      Pre-computed factor betas from two_factor_regression model.
+      Contains: symbol, date, beta_market, beta_esg
 
-      Contains:
-        - Identifiers: symbol, date, beta_date
-        - Factor exposures: beta_market, beta_esg (original and capped)
-        - Risk-free rate: RF (monthly decimal)
-        - Expected returns: ER_monthly, ER_annual
-        - Factor premia: lambda_market, lambda_esg (metadata)
+      If using latest betas (constant across time):
+        - One row per symbol (latest estimate)
+        - Applied to all forecast dates
 
-      Output frequency: Monthly (one expected return per month per stock)
-      Time horizon: Forward-looking (E[R_t+1 | Info_t])
+      If using time-varying betas (rolling window):
+        - Multiple rows per symbol (time-series)
+        - Most recent beta used for each forecast date
+
+  # Market prices (SPY as market proxy)
+  - name: market_prices
+    required: true
+    type:
+      domain: market-data
+      asset_class: equity
+      subdomain: bars
+      subtype: null
+      region: US
+      frequency: monthly
+    description: |
+      Market portfolio proxy (SPY) for calculating market excess returns.
+      Used to estimate market risk premium (λ_market) via HAC-robust mean.
+
+  # Risk-free rate (US Treasury rates)
+  - name: risk_free
+    required: true
+    type:
+      domain: reference-rates
+      asset_class: fixed-income
+      subdomain: yield-curves
+      subtype: null
+      region: US
+      frequency: monthly
+    description: |
+      Risk-free rate time-series (US Treasury rates).
+      Resampled to monthly frequency for expected return calculations.
+
+  # ESG factors (ESG factor returns for estimating ESG premium)
+  - name: esg_factors
+    required: true
+    type:
+      domain: derived-metrics
+      asset_class: equity
+      subdomain: factors
+      region: null
+      frequency: monthly
+    description: |
+      ESG factor returns from esg_factor model.
+      Used to estimate ESG risk premium (λ_ESG) via HAC-robust mean.
+      Typically uses "ESG" factor (composite), but can use E, S, G, or ESG_mom.
+
+output:
+  type:
+    domain: derived-metrics
+    asset_class: equity
+    subdomain: models
+    subtype: capm
+    region: null
+    frequency: monthly
+  description: |
+    Expected returns for each stock at each forecast date.
+
+    Contains:
+      - Identifiers: symbol, date, beta_date
+      - Factor exposures: beta_market, beta_esg (original and capped)
+      - Risk-free rate: RF (monthly decimal)
+      - Expected returns: ER_monthly, ER_annual
+      - Factor premia: lambda_market, lambda_esg (metadata)
+
+    Output frequency: Monthly (one expected return per month per stock)
+    Time horizon: Forward-looking (E[R_t+1 | Info_t])
 
 parameters:
   # Factor premium estimation (shrinkage correction for sample period bias)

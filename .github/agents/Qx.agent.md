@@ -226,13 +226,12 @@ builder:
   version: 1.0.0
   description: "One-line description"
 
-io:
-  output:
-    type:
-      domain: market-data
-      asset_class: equity
-      subdomain: bars
-      frequency: daily
+output:
+  type:
+    domain: market-data
+    asset_class: equity
+    subdomain: bars
+    frequency: daily
 
 parameters:
   symbols:
@@ -400,25 +399,24 @@ model:
   version: 1.0.0
   description: "ESG factor model"
 
-io:
-  inputs:
-    - name: esg_scores
-      required: true
-      type:
-        domain: esg
-        subdomain: esg-scores
-
-    - name: prices
-      required: true
-      type:
-        domain: market-data
-        subdomain: bars
-        frequency: monthly
-
-  output:
+inputs:
+  - name: esg_scores
+    required: true
     type:
-      domain: derived-metrics
-      subdomain: factor-returns
+      domain: esg
+      subdomain: esg-scores
+
+  - name: prices
+    required: true
+    type:
+      domain: market-data
+      subdomain: bars
+      frequency: monthly
+
+output:
+  type:
+    domain: derived-metrics
+    subdomain: factor-returns
 
 parameters:
   sector_neutral:

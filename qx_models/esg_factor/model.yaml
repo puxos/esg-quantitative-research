@@ -22,73 +22,73 @@ model:
     - Month t ESG score → used for month t+12 trading
     - Conservative: maximizes lag, minimizes look-ahead risk
 
-io:
-  inputs:
-    # Input 1: Price data (curated) - for returns calculation
-    - name: equity_prices
-      required: true
-      type:
-        domain: market-data
-        asset_class: equity
-        subdomain: bars
-        region: null
-        frequency: null
-      description: "Monthly OHLCV price data (specify region and frequency in partitions)"
+inputs:
+  # Input 1: Price data (curated) - for returns calculation
+  - name: equity_prices
+    required: true
+    type:
+      domain: market-data
+      asset_class: equity
+      subdomain: bars
+      region: null
+      frequency: null
+    description: "Monthly OHLCV price data (specify region and frequency in partitions)"
 
-    # Input 2: ESG scores (curated)
-    - name: esg_scores
-      required: true
-      type:
-        domain: esg
-        asset_class: equity
-        subdomain: esg-scores
-        region: null
-        frequency: null
-      description: "Annual ESG scores (esg_year with 'year' column for availability)"
+  # Input 2: ESG scores (curated)
+  - name: esg_scores
+    required: true
+    type:
+      domain: esg
+      asset_class: equity
+      subdomain: esg-scores
+      region: null
+      frequency: null
+    description: "Annual ESG scores (esg_year with 'year' column for availability)"
 
-    # Input 3: Risk-free rate (curated)
-    - name: risk_free
-      required: true
-      type:
-        domain: reference-rates
-        asset_class: fixed-income
-        subdomain: yield-curves
-        region: null
-        frequency: null
-      description: "Monthly risk-free rates (specify region and frequency in partitions)"
-    # Input 4: Universe filter (optional processed)
-    - name: universe_filter
-      required: false
-      type:
-        domain: derived-metrics
-        asset_class: equity
-        subdomain: models # Using generic 'models' subdomain for now
-        region: null
-        frequency: null
-      description: |
-        Optional universe filter from UniverseFilterModel.
-        If provided, will filter all inputs to tickers that passed_filter=True.
-        Enables automatic filtering to ESG-continuous universe.
+  # Input 3: Risk-free rate (curated)
+  - name: risk_free
+    required: true
+    type:
+      domain: reference-rates
+      asset_class: fixed-income
+      subdomain: yield-curves
+      region: null
+      frequency: null
+    description: "Monthly risk-free rates (specify region and frequency in partitions)"
 
-  output:
+  # Input 4: Universe filter (optional processed)
+  - name: universe_filter
+    required: false
     type:
       domain: derived-metrics
       asset_class: equity
-      subdomain: factor-returns
-      subtype: esg-factors
+      subdomain: models
       region: null
       frequency: null
     description: |
-      Monthly ESG factor returns (excess returns, risk-free adjusted).
+      Optional universe filter from UniverseFilterModel.
+      If provided, will filter all inputs to tickers that passed_filter=True.
+      Enables automatic filtering to ESG-continuous universe.
 
-      Output columns: date, factor_name, factor_return, long_return, short_return
+output:
+  type:
+    domain: derived-metrics
+    asset_class: equity
+    subdomain: factor-returns
+    subtype: esg-factors
+    region: null
+    frequency: null
+  description: |
+    Monthly ESG factor returns (excess returns, risk-free adjusted).
 
-      Factor names:
-      - ESG: Composite ESG score factor
-      - E: Environmental pillar factor
-      - S: Social pillar factor
-      - G: Governance pillar factor
-      - ESG_mom: ESG momentum factor (YoY changes)
+    Output columns: date, factor_name, factor_return, long_return, short_return
+
+    Factor names:
+    - ESG: Composite ESG score factor
+    - E: Environmental pillar factor
+    - S: Social pillar factor
+    - G: Governance pillar factor
+    - ESG_mom: ESG momentum factor (YoY changes)
 
 parameters:
   quantile:

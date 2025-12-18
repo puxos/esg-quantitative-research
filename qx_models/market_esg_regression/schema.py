@@ -13,7 +13,7 @@ from qx.common.schema_loader import load_contract
 SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
 
 
-def get_market_esg_betas_contract() -> DatasetContract:
+def get_market_esg_regression_contract() -> DatasetContract:
     """
     Get the dataset contract for two-factor regression betas.
 
