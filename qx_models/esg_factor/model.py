@@ -71,119 +71,76 @@ class ESGFactorModel(BaseModel):
         prices_df = inputs["equity_prices"]
         esg_df = inputs["esg_scores"]
         rf_df = inputs["risk_free"]
-        universe_filter_df = inputs.get("universe_filter")  # Optional
+        universe_filter_df = inputs.get("universe_filter")
 
         # Filter to universe if provided
         if universe_filter_df is not None:
-            logger.info("\n🔍 Filtering to universe_filter (passed tickers only)...")
             filtered_tickers = universe_filter_df[
                 universe_filter_df["passed_filter"] == True
             ]["ticker"].unique()
-            logger.info(f"  Universe filter: {len(filtered_tickers)} tickers passed")
-
-            # Filter prices and ESG scores
-            prices_before = len(prices_df["symbol"].unique())
-            esg_before = len(esg_df["ticker"].unique())
 
             prices_df = prices_df[prices_df["symbol"].isin(filtered_tickers)].copy()
             esg_df = esg_df[esg_df["ticker"].isin(filtered_tickers)].copy()
 
-            prices_after = len(prices_df["symbol"].unique())
-            esg_after = len(esg_df["ticker"].unique())
-
-            logger.info(f"  Filtered prices: {prices_before} → {prices_after} tickers")
-            logger.info(f"  Filtered ESG: {esg_before} → {esg_after} tickers")
-        else:
-            logger.info("\nℹ️  No universe_filter provided, using all tickers")
+            logger.info(f"\n🔍 Filtered to {len(filtered_tickers)} tickers")
 
         # Extract parameters
         quantile = params["quantile"]
         sector_neutral = params["sector_neutral"]
         lag_signal = params["lag_signal"]
         weighting = params["weighting"]
-        esg_annual_lag = params["esg_annual_lag"]
         return_legs = params["return_legs"]
 
-        logger.info(f"Parameters:")
-        logger.info(f"  Quantile: {quantile} (top/bottom {quantile*100:.0f}%)")
-        logger.info(f"  Sector neutral: {sector_neutral}")
-        logger.info(f"  Signal lag: {lag_signal} periods")
-        logger.info(f"  Weighting: {weighting}")
-        logger.info(f"  ESG annual lag: {esg_annual_lag} months")
-        logger.info(f"  Return legs: {return_legs}")
+        logger.info(
+            f"\nParameters: quantile={quantile}, sector_neutral={sector_neutral}, "
+            f"weighting={weighting}, signal_lag={lag_signal}"
+        )
 
-        # Resample daily data to monthly (end of month)
-        logger.info("\n📅 Resampling daily data to monthly...")
+        # Resample daily data to monthly
+        logger.info("\n📅 Resampling to monthly...")
         prices_monthly = self._resample_to_monthly(prices_df)
         rf_monthly = self._resample_rf_to_monthly(rf_df)
-
-        logger.info(f"  Prices: {len(prices_monthly)} observations")
-        logger.info(f"  Risk-free: {len(rf_monthly)} observations")
-
-        # Compute monthly returns
-        logger.info("\n💹 Computing monthly returns...")
         returns_df = self._compute_monthly_returns(prices_monthly)
-        logger.info(f"  Returns: {len(returns_df)} observations")
 
-        # Compute weights for value-weighting if requested
+        # Compute market cap weights if value-weighted
         weights_df = None
         if weighting == "value":
-            logger.info("\n⚖️ Computing market cap weights...")
             weights_df = self._compute_market_cap_weights(prices_monthly)
-            if weights_df is not None:
-                logger.info(f"  Weights: {len(weights_df)} observations")
-            else:
-                logger.warning(
-                    "  No volume data available, falling back to equal weighting"
-                )
+            if weights_df is None:
+                logger.warning("⚠️  No volume data, using equal weighting")
 
         # Convert to excess returns
-        logger.info("\n📊 Converting to excess returns...")
         panel_excess = self._to_excess_returns(returns_df, rf_monthly)
-        logger.info(f"  Excess returns: {len(panel_excess)} observations")
+        logger.info(f"   {len(panel_excess)} excess return observations")
 
-        # Prepare ESG scores (already monthly from builder)
-        logger.info("\n🌿 Preparing ESG scores...")
+        # Prepare ESG scores (convert annual to monthly, rename columns)
+        logger.info(
+            f"\n🌿 Preparing ESG: {esg_df['ticker'].nunique()} tickers, "
+            f"years {esg_df['year'].min()}-{esg_df['year'].max()}"
+        )
         esg_prepared = self._prepare_esg_scores(esg_df)
 
-        # Apply annual ESG lag
-        logger.info(f"\n⏳ Applying {esg_annual_lag}-month ESG lag...")
-        esg_lagged = self._apply_annual_esg_lag(esg_prepared, lag_months=esg_annual_lag)
-        logger.info(f"  After lag: {len(esg_lagged)} observations")
+        # Note: ESG builder already applies lag (esg_year → year+1)
+        # Signal lag (t-1 → t) handled in factor construction
+        esg_lagged = esg_prepared[["ESG", "E", "S", "G"]]
+        logger.info(f"   {len(esg_lagged)} monthly ESG observations ready")
 
         # Load sector mapping if sector-neutral
         sector_map = None
         if sector_neutral:
-            logger.info("\n🏭 Loading sector mapping...")
             sector_map = self._get_sector_mapping(esg_lagged)
             if sector_map is not None:
                 logger.info(
-                    f"  Mapped {len(sector_map)} tickers to {sector_map.nunique()} sectors"
+                    f"\n🏭 Sectors: {len(sector_map)} tickers → {sector_map.nunique()} sectors"
                 )
             else:
-                logger.warning(
-                    "  No sector data available, using cross-sectional ranking"
-                )
+                logger.warning("\n⚠️  No sector data, using cross-sectional ranking")
 
         # Build level factors (ESG, E, S, G)
-        logger.info("\n🏗️ Building level factors...")
+        logger.info("\n🏗️ Building level factors: ESG, E, S, G")
         factors = []
-        for col in [
-            "esg_score",
-            "environmental_pillar_score",
-            "social_pillar_score",
-            "governance_pillar_score",
-        ]:
-            factor_short_name = {
-                "esg_score": "ESG",
-                "environmental_pillar_score": "E",
-                "social_pillar_score": "S",
-                "governance_pillar_score": "G",
-            }[col]
-
-            logger.info(f"  Building {factor_short_name} factor...")
-            sig = esg_lagged[[col]].rename(columns={col: factor_short_name})
-
+        for col in ["ESG", "E", "S", "G"]:
+            sig = esg_lagged[[col]]
             factor_df = self._build_long_short_factor(
                 panel_excess=panel_excess,
                 signal_df=sig,
@@ -193,12 +150,12 @@ class ESGFactorModel(BaseModel):
                 lag_signal=lag_signal,
                 return_legs=return_legs,
             )
-
             factors.append(factor_df)
+            logger.info(f"   ✓ {col}: {len(factor_df)} observations")
 
-        # Build momentum factor
-        logger.info("\n🚀 Building ESG momentum factor...")
-        esg_mom_sig = self._build_esg_momentum_signal(esg_lagged[["esg_score"]])
+        # Build momentum factor (YoY ESG change)
+        logger.info("\n🚀 Building ESG momentum factor")
+        esg_mom_sig = self._build_esg_momentum_signal(esg_lagged[["ESG"]])
 
         if not esg_mom_sig.empty:
             esg_mom_factor = self._build_long_short_factor(
@@ -211,39 +168,36 @@ class ESGFactorModel(BaseModel):
                 return_legs=return_legs,
             )
             factors.append(esg_mom_factor)
+            logger.info(f"   ✓ ESG_mom: {len(esg_mom_factor)} observations")
         else:
-            logger.warning("  No ESG momentum signal available")
+            logger.warning("   ⚠️ No momentum signal available")
 
         # Combine all factors
-        logger.info("\n🔗 Combining factors...")
         if not factors:
-            raise ValueError(
-                "No factors were generated - check data availability and alignment"
-            )
+            raise ValueError("No factors generated - check data availability")
 
-        result_df = pd.concat(factors, ignore_index=True)
-
-        # Drop any NaN rows
-        result_df = result_df.dropna()
+        result_df = pd.concat(factors, ignore_index=True).dropna()
 
         if result_df.empty:
-            raise ValueError(
-                "All factor returns are NaN - check data alignment and date ranges"
-            )
+            raise ValueError("All factor returns are NaN - check data alignment")
 
         logger.info(
-            f"✅ Built {result_df['factor_name'].nunique()} factors with {len(result_df)} observations"
+            f"\n🔗 Combined {result_df['factor_name'].nunique()} factors: "
+            f"{result_df['factor_name'].unique().tolist()}"
         )
+
+        # Convert to wide format (one row per date, all factors as columns)
+        result_wide = self._pivot_to_wide_format(result_df, return_legs=return_legs)
+
+        date_min = pd.to_datetime(result_wide["date"].min()).date()
+        date_max = pd.to_datetime(result_wide["date"].max()).date()
         logger.info(
-            f"   Date range: {result_df['date'].min()} to {result_df['date'].max()}"
+            f"\n✅ Output: {len(result_wide)} rows × {len(result_wide.columns)} columns "
+            f"({date_min} to {date_max})"
         )
-        logger.info(f"   Factors: {result_df['factor_name'].unique().tolist()}")
-
-        logger.info("=" * 80)
-        logger.info("ESG Factor Model - Execution Completed")
         logger.info("=" * 80)
 
-        return result_df
+        return result_wide
 
     @staticmethod
     def _resample_to_monthly(prices_df: pd.DataFrame) -> pd.DataFrame:
@@ -324,28 +278,17 @@ class ESGFactorModel(BaseModel):
         returns_df: pd.DataFrame, rf_df: pd.DataFrame
     ) -> pd.DataFrame:
         """Convert returns to excess returns (subtract risk-free rate)"""
-        # Reset index for merge
-        returns_with_date = returns_df.reset_index()
-
-        # Normalize RF to monthly decimal (from annual percentage)
+        returns = returns_df.reset_index()
         rf_copy = rf_df.copy()
-        rf_copy["RF"] = rf_copy["rate"] / 100 / 12
+        rf_copy["RF"] = rf_copy["rate"] / 100 / 12  # Annual % → monthly decimal
 
-        # Merge
-        panel = returns_with_date.merge(rf_copy[["date", "RF"]], on="date", how="left")
+        panel = returns.merge(rf_copy[["date", "RF"]], on="date", how="left")
         panel["excess"] = panel["ret"] - panel["RF"]
-
-        # Restore MultiIndex
-        panel = panel.set_index(["date", "symbol"]).sort_index()
-
-        return panel[["excess"]]
+        return panel.set_index(["date", "symbol"]).sort_index()[["excess"]]
 
     @staticmethod
     def _prepare_esg_scores(esg_df: pd.DataFrame) -> pd.DataFrame:
-        """Prepare ESG scores for factor construction"""
-        esg = esg_df.copy()
-
-        # Ensure required columns (use 'year' for annual ESG data)
+        """Convert annual ESG scores to monthly format"""
         required_cols = [
             "ticker",
             "year",
@@ -354,66 +297,61 @@ class ESGFactorModel(BaseModel):
             "social_pillar_score",
             "governance_pillar_score",
         ]
-        missing = [col for col in required_cols if col not in esg.columns]
+        missing = [col for col in required_cols if col not in esg_df.columns]
         if missing:
-            raise ValueError(f"ESG data missing required columns: {missing}")
+            raise ValueError(f"ESG data missing columns: {missing}")
 
-        # Rename ticker to symbol for consistency
-        if "ticker" in esg.columns and "symbol" not in esg.columns:
-            esg = esg.rename(columns={"ticker": "symbol"})
+        esg = esg_df.rename(
+            columns={
+                "ticker": "symbol",
+                "esg_score": "ESG",
+                "environmental_pillar_score": "E",
+                "social_pillar_score": "S",
+                "governance_pillar_score": "G",
+            }
+        )
 
-        # Convert year to date (first day of year)
-        # Year column represents when ESG data becomes available (esg_year + 1)
-        esg["date"] = pd.to_datetime(esg["year"].astype(str) + "-01-01")
+        # Replicate annual ESG scores across all months in year
+        monthly_records = []
+        for _, row in esg.iterrows():
+            year = int(row["year"])
+            dates = pd.date_range(f"{year}-01-01", f"{year}-12-31", freq="ME")
+            for date in dates:
+                record = row.copy()
+                record["date"] = date
+                monthly_records.append(record)
 
-        # Create MultiIndex
-        esg = esg.set_index(["date", "symbol"]).sort_index()
-
-        return esg
+        esg_monthly = pd.DataFrame(monthly_records)
+        return esg_monthly.set_index(["date", "symbol"]).sort_index()
 
     @staticmethod
     def _apply_annual_esg_lag(
         esg_df: pd.DataFrame, lag_months: int = 12
     ) -> pd.DataFrame:
-        """Apply lag to ESG scores to avoid look-ahead bias"""
-        esg_cols = [
-            "esg_score",
-            "environmental_pillar_score",
-            "social_pillar_score",
-            "governance_pillar_score",
-        ]
-
-        # Shift ESG scores forward by lag_months
-        lagged = esg_df.groupby(level="symbol")[esg_cols].shift(lag_months)
-
-        return lagged.dropna()
+        """Return ESG scores (builder already applies esg_year → year+1 lag)"""
+        return esg_df[["ESG", "E", "S", "G"]]
 
     @staticmethod
     def _build_esg_momentum_signal(esg_df: pd.DataFrame) -> pd.DataFrame:
         """Build ESG momentum signal (z-scored YoY changes)"""
-        # Calculate year-over-year ESG changes (12-month lag)
-        d_esg = esg_df.groupby(level="symbol")["esg_score"].diff(12).to_frame("dESG")
+        # YoY ESG change (12-month diff for replicated monthly data)
+        d_esg = esg_df.groupby(level="symbol")["ESG"].diff(12).to_frame("dESG")
 
-        # Z-score cross-section by month
+        # Z-score cross-sectionally by date
         mom = []
         for dt, df in d_esg.groupby(level="date"):
             x = df.droplevel(0)
-            mu = x["dESG"].mean()
-            sd = x["dESG"].std(ddof=0)
+            mu, sd = x["dESG"].mean(), x["dESG"].std(ddof=0)
             z = (x["dESG"] - mu) / (sd if sd and sd != 0 else 1)
 
-            mom_df = pd.DataFrame({"ESG_mom": z}, index=x.index)
-            mom_df["date"] = dt
-            mom_df["symbol"] = mom_df.index
+            mom_df = pd.DataFrame({"ESG_mom": z, "date": dt, "symbol": x.index})
             mom.append(mom_df)
 
         if not mom:
             return pd.DataFrame()
 
         result = pd.concat(mom, ignore_index=True)
-        result = result.set_index(["date", "symbol"]).sort_index()
-
-        return result[["ESG_mom"]]
+        return result.set_index(["date", "symbol"]).sort_index()[["ESG_mom"]]
 
     @staticmethod
     def _get_sector_mapping(esg_df: pd.DataFrame) -> Optional[pd.Series]:
@@ -596,3 +534,58 @@ class ESGFactorModel(BaseModel):
         w = weights.fillna(0)
         w = w / (w.sum() if w.sum() != 0 else 1)
         return float(np.dot(sub_df["excess"].to_numpy(), w.to_numpy()))
+
+    @staticmethod
+    def _pivot_to_wide_format(long_df: pd.DataFrame, return_legs: bool) -> pd.DataFrame:
+        """
+        Convert long format (one row per factor per date) to wide format (one row per date)
+
+        Args:
+            long_df: DataFrame with columns [date, factor_name, factor_return, long_return, short_return]
+            return_legs: Whether long/short legs are included
+
+        Returns:
+            DataFrame with one row per date and columns like:
+            [date, ESG_factor, ESG_long, ESG_short, E_factor, E_long, E_short, ...]
+        """
+        # Pivot factor returns
+        factor_pivot = long_df.pivot(
+            index="date", columns="factor_name", values="factor_return"
+        )
+
+        # Rename columns to match legacy format (factor_name → factor_name_factor)
+        factor_pivot.columns = [f"{col}_factor" for col in factor_pivot.columns]
+
+        if return_legs:
+            # Pivot long leg returns
+            long_pivot = long_df.pivot(
+                index="date", columns="factor_name", values="long_return"
+            )
+            long_pivot.columns = [f"{col}_long" for col in long_pivot.columns]
+
+            # Pivot short leg returns
+            short_pivot = long_df.pivot(
+                index="date", columns="factor_name", values="short_return"
+            )
+            short_pivot.columns = [f"{col}_short" for col in short_pivot.columns]
+
+            # Combine all pivots
+            result = pd.concat([long_pivot, short_pivot, factor_pivot], axis=1)
+
+            # Reorder columns: for each factor, show long, short, factor
+            factor_names = long_df["factor_name"].unique()
+            ordered_cols = []
+            for fname in factor_names:
+                if f"{fname}_long" in result.columns:
+                    ordered_cols.extend(
+                        [f"{fname}_long", f"{fname}_short", f"{fname}_factor"]
+                    )
+
+            result = result[ordered_cols]
+        else:
+            result = factor_pivot
+
+        # Reset index to make date a column
+        result = result.reset_index()
+
+        return result

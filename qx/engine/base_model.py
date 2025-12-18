@@ -157,5 +157,14 @@ class BaseModel(abc.ABC):
             ),
             run_ts=pd.Timestamp.utcnow(),
         )
-        self.writer.write(outputs, self.output_dt.subdomain, self.info["id"])
+        # Pass full dataset_type (includes subtype) to writer
+        # Convert subdomain enum to string value for path construction
+        output_type_str = (
+            self.output_dt.subdomain.value
+            if hasattr(self.output_dt.subdomain, "value")
+            else str(self.output_dt.subdomain)
+        )
+        self.writer.write(
+            outputs, output_type_str, self.info["id"], dataset_type=self.output_dt
+        )
         return outputs

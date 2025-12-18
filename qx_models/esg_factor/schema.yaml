@@ -1,5 +1,6 @@
 # ESG Factor Model - Output Schema
 # Long-short factor returns based on ESG signals
+# Wide format: one row per date with all factors as columns
 
 dataset:
   domain: derived-metrics
@@ -20,31 +21,113 @@ contract:
       filterable: true
       filter_type: range
 
-    - name: factor_name
-      type: string
-      description: Factor identifier (ESG, E, S, G, ESG_mom)
-      required: true
-      filterable: true
-      filter_type: in
-
-    - name: factor_return
+    # ESG Factor (composite score)
+    - name: ESG_long
       type: float
-      description: Long-short excess return (monthly decimal)
-      required: true
+      description: ESG factor long leg return
+      required: false
       filterable: true
       filter_type: range
 
-    - name: long_return
+    - name: ESG_short
       type: float
-      description: Long leg excess return
-      required: true
+      description: ESG factor short leg return
+      required: false
       filterable: true
       filter_type: range
 
-    - name: short_return
+    - name: ESG_factor
       type: float
-      description: Short leg excess return
-      required: true
+      description: ESG factor long-short return
+      required: false
+      filterable: true
+      filter_type: range
+
+    # Environmental Factor
+    - name: E_long
+      type: float
+      description: Environmental factor long leg return
+      required: false
+      filterable: true
+      filter_type: range
+
+    - name: E_short
+      type: float
+      description: Environmental factor short leg return
+      required: false
+      filterable: true
+      filter_type: range
+
+    - name: E_factor
+      type: float
+      description: Environmental factor long-short return
+      required: false
+      filterable: true
+      filter_type: range
+
+    # Social Factor
+    - name: S_long
+      type: float
+      description: Social factor long leg return
+      required: false
+      filterable: true
+      filter_type: range
+
+    - name: S_short
+      type: float
+      description: Social factor short leg return
+      required: false
+      filterable: true
+      filter_type: range
+
+    - name: S_factor
+      type: float
+      description: Social factor long-short return
+      required: false
+      filterable: true
+      filter_type: range
+
+    # Governance Factor
+    - name: G_long
+      type: float
+      description: Governance factor long leg return
+      required: false
+      filterable: true
+      filter_type: range
+
+    - name: G_short
+      type: float
+      description: Governance factor short leg return
+      required: false
+      filterable: true
+      filter_type: range
+
+    - name: G_factor
+      type: float
+      description: Governance factor long-short return
+      required: false
+      filterable: true
+      filter_type: range
+
+    # ESG Momentum Factor
+    - name: ESG_mom_long
+      type: float
+      description: ESG momentum factor long leg return
+      required: false
+      filterable: true
+      filter_type: range
+
+    - name: ESG_mom_short
+      type: float
+      description: ESG momentum factor short leg return
+      required: false
+      filterable: true
+      filter_type: range
+
+    - name: ESG_mom_factor
+      type: float
+      description: ESG momentum factor long-short return
+      required: false
       filterable: true
       filter_type: range
 
