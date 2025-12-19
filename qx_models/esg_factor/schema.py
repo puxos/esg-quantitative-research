@@ -13,15 +13,17 @@ from qx.common.schema_loader import load_contract
 SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
 
 
-def get_esg_factors_contract() -> DatasetContract:
+def get_contracts() -> list[DatasetContract]:
     """
     Get the dataset contract for ESG factor returns.
+
+    Standard contract discovery function for auto-registration.
 
     Output includes:
     - Level factors: ESG, E, S, G (long-short portfolios based on pillar scores)
     - Momentum factor: ESG_mom (long-short based on YoY ESG score changes)
 
     Returns:
-        DatasetContract for processed/equity/factors
+        List containing single DatasetContract for processed/equity/factors
     """
-    return load_contract(SCHEMA_PATH)
+    return [load_contract(SCHEMA_PATH)]

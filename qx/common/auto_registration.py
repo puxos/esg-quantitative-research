@@ -5,9 +5,9 @@ Automatically discovers and registers dataset contracts from builder, loader, an
 without requiring manual imports in core qx code.
 
 Convention:
-- Each package must have a schema.py file with contract getter functions
-- Function names must follow pattern: get_*_contract() or get_*_contracts()
-- Functions must return DatasetContract or list[DatasetContract]
+- Each package must have a schema.py file with get_contracts() function
+- Function name must be exactly: get_contracts()
+- Function must return list[DatasetContract] (even for single contract)
 """
 
 import importlib
@@ -33,7 +33,7 @@ def discover_contract_functions(
 
     Convention:
         - Looks for schema.py in each subdirectory
-        - Imports functions matching get_*_contract() or get_*_contracts()
+        - Imports get_contracts() function (exactly this name)
         - Skips __pycache__, __init__.py, and non-directory items
     """
     if not package_path.exists():
@@ -56,13 +56,9 @@ def discover_contract_functions(
         try:
             module = importlib.import_module(module_name)
 
-            # Find contract getter functions
-            for name, obj in inspect.getmembers(module, inspect.isfunction):
-                # Match: get_*_contract or get_*_contracts
-                if name.startswith("get_") and name.endswith(
-                    ("_contract", "_contracts")
-                ):
-                    contract_functions.append(obj)
+            # Look for get_contracts() function (standard name)
+            if hasattr(module, "get_contracts"):
+                contract_functions.append(module.get_contracts)
 
         except Exception as e:
             # Log error but continue (don't fail entire registration)
@@ -87,26 +83,18 @@ def register_contracts_from_functions(
         Number of contracts registered
 
     Handles:
-        - Functions that return single DatasetContract
-        - Functions that return list[DatasetContract]
-        - Functions that require parameters (calls with no args, skips if fails)
+        - get_contracts() functions that return list[DatasetContract]
+        - Always expects list return type (even for single contract)
     """
     registered_count = 0
 
     for func in functions:
         try:
-            # Try calling with no arguments first
+            # Call get_contracts() (no parameters needed)
             result = func()
 
-            # Handle single contract
-            if isinstance(result, DatasetContract):
-                reg.register(result)
-                registered_count += 1
-                if verbose:
-                    print(f"  ✓ {func.__module__}.{func.__name__}()")
-
-            # Handle list of contracts
-            elif isinstance(result, list):
+            # Should always be a list
+            if isinstance(result, list):
                 for contract in result:
                     if isinstance(contract, DatasetContract):
                         reg.register(contract)
@@ -115,13 +103,11 @@ def register_contracts_from_functions(
                     print(
                         f"  ✓ {func.__module__}.{func.__name__}() → {len(result)} contracts"
                     )
-
-        except TypeError as e:
-            # Function requires parameters - skip for now
-            # These need to be registered manually or with explicit parameters
-            if verbose:
-                print(f"  ⊘ {func.__module__}.{func.__name__}() - requires parameters")
-            continue
+            else:
+                if verbose:
+                    print(
+                        f"  ✗ {func.__module__}.{func.__name__}() - expected list, got {type(result)}"
+                    )
 
         except Exception as e:
             # Log error but continue

@@ -9,12 +9,11 @@ Exports:
 """
 
 from .builder import SP500MembershipBuilder
-from .schema import get_sp500_daily_contract, get_sp500_intervals_contract
+from .schema import get_contracts
 from .utils import synthesize_membership_intervals
 
 __all__ = [
     "SP500MembershipBuilder",
-    "get_sp500_daily_contract",
-    "get_sp500_intervals_contract",
+    "get_contracts",
     "synthesize_membership_intervals",
 ]

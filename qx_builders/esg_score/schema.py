@@ -14,12 +14,14 @@ from qx.common.schema_loader import load_contract
 SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
 
 
-def get_esg_scores_contract() -> DatasetContract:
+def get_contracts() -> list[DatasetContract]:
     """
     Get ESG scores dataset contract.
 
+    Standard contract discovery function for auto-registration.
+
     Returns:
-        DatasetContract for ESG scores
+        List containing single DatasetContract for ESG scores
 
     Schema:
         - 7 columns: ticker, gvkey, esg_year, esg_score,
@@ -30,7 +32,7 @@ def get_esg_scores_contract() -> DatasetContract:
         - Dependencies: gvkey_mapping
 
     Example:
-        contract = get_esg_scores_contract()
-        # → DatasetContract for annual ESG scores
+        contracts = get_contracts()
+        # → [DatasetContract for annual ESG scores]
     """
-    return load_contract(SCHEMA_PATH)
+    return [load_contract(SCHEMA_PATH)]

@@ -5,15 +5,15 @@ Seeds the dataset registry with contracts from all builders and models.
 
 Uses dynamic auto-discovery to avoid manual imports:
 - Automatically discovers contracts from qx_builders/ and qx_models/ packages
-- Each package's schema.py is imported and get_*_contract() functions are called
-- Manual registration only needed for special cases (e.g., parameterized contracts)
+- Each package's schema.py must have a get_contracts() function
+- Function must return list[DatasetContract] (even for single contract)
 """
 
 from qx.common.auto_registration import auto_register_contracts
 from qx.common.contracts import DatasetRegistry
 
 
-def seed_registry(reg: DatasetRegistry, verbose: bool = False):
+def seed_registry(reg: DatasetRegistry, verbose: bool = False) -> dict:
     """
     Seed the registry with all dataset contracts.
 
@@ -22,12 +22,14 @@ def seed_registry(reg: DatasetRegistry, verbose: bool = False):
     - qx_models/ packages (analytical models)
 
     Auto-discovery looks for schema.py files with:
-    - get_*_contract() → single contract
-    - get_*_contracts() → list of contracts
+    - get_contracts() → list[DatasetContract] (standard function name)
 
     Args:
         reg: DatasetRegistry to populate
         verbose: Print registration progress (default: False)
+
+    Returns:
+        Dict with registration statistics (builders, models, total)
     """
 
     # ==============================================================================
@@ -50,3 +52,5 @@ def seed_registry(reg: DatasetRegistry, verbose: bool = False):
         print(f"✅ Registration Complete")
         print(f"   Total: {stats['total']} contracts")
         print("=" * 80)
+
+    return stats

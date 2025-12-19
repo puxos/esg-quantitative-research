@@ -11,9 +11,11 @@ from qx.common.schema_loader import load_contract
 SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
 
 
-def get_portfolio_weights_contract() -> DatasetContract:
+def get_contracts() -> list[DatasetContract]:
     """
     Schema contract for optimal portfolio weights output.
+
+    Standard contract discovery function for auto-registration.
 
     Output format:
         - One row per stock in optimal portfolio (active positions only)
@@ -66,6 +68,6 @@ def get_portfolio_weights_contract() -> DatasetContract:
             data/processed/portfolio_weights/model=markowitz_portfolio/run_date=2024-12-04/part-<run_id>.parquet
 
     Returns:
-        DatasetContract for portfolio weights output
+        List containing single DatasetContract for portfolio weights output
     """
-    return load_contract(SCHEMA_PATH)
+    return [load_contract(SCHEMA_PATH)]

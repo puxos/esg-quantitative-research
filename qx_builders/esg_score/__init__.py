@@ -12,9 +12,9 @@ Dependencies:
 """
 
 from .builder import ESGScoreBuilder
-from .schema import get_esg_scores_contract
+from .schema import get_contracts
 
 __all__ = [
     "ESGScoreBuilder",
-    "get_esg_scores_contract",
+    "get_contracts",
 ]

@@ -9,12 +9,12 @@ Exports:
 """
 
 from .builder import TiingoOHLCVBuilder
-from .schema import get_tiingo_ohlcv_contract
+from .schema import get_contracts
 from .utils import align_start_date_to_frequency, get_tolerance_for_frequency
 
 __all__ = [
     "TiingoOHLCVBuilder",
-    "get_tiingo_ohlcv_contract",
+    "get_contracts",
     "align_start_date_to_frequency",
     "get_tolerance_for_frequency",
 ]

@@ -10,12 +10,12 @@ Exports:
 """
 
 from .builder import USTreasuryRateBuilder
-from .schema import get_us_treasury_rate_contract
+from .schema import get_contracts
 from .utils import FRED_SERIES, get_default_rate_types, get_fred_series_id
 
 __all__ = [
     "USTreasuryRateBuilder",
-    "get_us_treasury_rate_contract",
+    "get_contracts",
     "get_default_rate_types",
     "get_fred_series_id",
     "FRED_SERIES",

@@ -14,6 +14,6 @@ This model implements the Extended CAPM with ESG factor from:
 """
 
 from .model import FactorExpectedReturnsModel
-from .schema import get_factor_expected_returns_contract
+from .schema import get_contracts
 
-__all__ = ["FactorExpectedReturnsModel", "get_factor_expected_returns_contract"]
+__all__ = ["FactorExpectedReturnsModel", "get_contracts"]

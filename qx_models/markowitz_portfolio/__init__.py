@@ -18,6 +18,6 @@ Academic foundation:
 """
 
 from .model import MarkowitzPortfolioModel
-from .schema import get_portfolio_weights_contract
+from .schema import get_contracts
 
-__all__ = ["MarkowitzPortfolioModel", "get_portfolio_weights_contract"]
+__all__ = ["MarkowitzPortfolioModel", "get_contracts"]

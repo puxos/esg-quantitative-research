@@ -10,12 +10,12 @@ Components:
 """
 
 from .builder import GVKEYMappingBuilder
-from .schema import get_gvkey_mapping_contract
+from .schema import get_contracts
 from .utils import clean_ticker_symbol, load_gvkey_mapping_from_curated
 
 __all__ = [
     "GVKEYMappingBuilder",
-    "get_gvkey_mapping_contract",
+    "get_contracts",
     "clean_ticker_symbol",
     "load_gvkey_mapping_from_curated",
 ]

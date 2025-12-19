@@ -11,9 +11,11 @@ from qx.common.schema_loader import load_contract
 SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
 
 
-def get_factor_expected_returns_contract() -> DatasetContract:
+def get_contracts() -> list[DatasetContract]:
     """
     Schema contract for factor expected returns output.
+
+    Standard contract discovery function for auto-registration.
 
     Output format:
         - One row per stock per forecast date (monthly frequency)
@@ -60,6 +62,6 @@ def get_factor_expected_returns_contract() -> DatasetContract:
             data/processed/factor_expected_returns/model=factor_expected_returns/run_date=2024-12-04/part-<run_id>.parquet
 
     Returns:
-        DatasetContract for factor expected returns output
+        List containing single DatasetContract for factor expected returns output
     """
-    return load_contract(SCHEMA_PATH)
+    return [load_contract(SCHEMA_PATH)]
