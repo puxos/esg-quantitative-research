@@ -3,6 +3,7 @@ Schema Loader
 
 Loads dataset contracts from YAML schema definitions.
 Provides type-safe contract generation from declarative schemas.
+Supports unified builder.yaml format with output.dataset structure.
 """
 
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import yaml
 
 from qx.common.contracts import DatasetContract
+from qx.common.enum_validator import validate_dataset_type_config
 from qx.common.types import (
     AssetClass,
     DatasetType,
@@ -20,7 +22,170 @@ from qx.common.types import (
     Frequency,
     Region,
     Subdomain,
+    dataset_type_from_config,
 )
+
+
+def load_contract_from_builder_yaml(yaml_path: Path) -> DatasetContract:
+    """
+    Load dataset contract from unified builder.yaml structure.
+
+    New unified format with output.dataset, output.schema, and output.partition_keys.
+
+    Args:
+        yaml_path: Path to builder.yaml file
+
+    Returns:
+        DatasetContract instance
+
+    Example builder.yaml structure:
+        output:
+          dataset:
+            domain: reference-rates
+            subdomain: yield-curves
+            frequency: null
+          schema:
+            version: schema_v1
+            required_columns:
+              - name: date
+                dtype: datetime64[ns]
+          partition_keys:
+            - rate_type
+            - frequency
+          path_template: "..."
+    """
+    with open(yaml_path) as f:
+        cfg = yaml.safe_load(f)
+
+    output_cfg = cfg.get("output", {})
+
+    # Load dataset type from output.dataset
+    dataset_cfg = output_cfg.get("dataset", {})
+    validate_dataset_type_config(dataset_cfg)
+    dataset_type = dataset_type_from_config(dataset_cfg)
+
+    # Load schema from output.schema
+    schema_cfg = output_cfg.get("schema", {})
+    schema_version = schema_cfg.get("version", "schema_v1")
+
+    required_columns = []
+    for col in schema_cfg.get("required_columns", []):
+        required_columns.append(
+            {
+                "name": col["name"],
+                "dtype": col["dtype"],
+            }
+        )
+
+    # Load partition keys
+    partition_keys = output_cfg.get("partition_keys", [])
+
+    # Load path template (optional)
+    path_template = output_cfg.get("path_template")
+    if not path_template:
+        # Auto-generate default template
+        path_template = (
+            "data/curated/{domain}/{subdomain}/{schema_version}/"
+            + "/".join(f"{key}={{{key}}}" for key in partition_keys)
+        )
+
+    return DatasetContract(
+        dataset_type=dataset_type,
+        schema_version=schema_version,
+        required_columns=required_columns,
+        partition_keys=partition_keys,
+        path_template=path_template,
+    )
+
+
+def load_contracts_from_builder_yaml(yaml_path: Path) -> list[DatasetContract]:
+    """
+    Load multiple dataset contracts from unified builder.yaml with multiple schemas.
+
+    For builders that produce different schemas based on mode (e.g., daily vs intervals),
+    the builder.yaml can define multiple schemas under output.schemas.
+
+    Args:
+        yaml_path: Path to builder.yaml file
+
+    Returns:
+        List of DatasetContract instances (one per schema)
+
+    Example builder.yaml structure:
+        output:
+          dataset:
+            domain: instrument-reference
+            subdomain: index-constituents
+          schemas:
+            daily:
+              version: schema_v1
+              required_columns:
+                - name: date
+                  dtype: datetime64[ns]
+                - name: ticker
+                  dtype: object
+            intervals:
+              version: schema_v1
+              required_columns:
+                - name: ticker
+                  dtype: object
+                - name: start_date
+                  dtype: datetime64[ns]
+                - name: end_date
+                  dtype: datetime64[ns]
+          partition_keys:
+            - universe
+            - mode
+    """
+    with open(yaml_path) as f:
+        cfg = yaml.safe_load(f)
+
+    output_cfg = cfg.get("output", {})
+
+    # Load dataset type from output.dataset
+    dataset_cfg = output_cfg.get("dataset", {})
+    validate_dataset_type_config(dataset_cfg)
+    base_dataset_type = dataset_type_from_config(dataset_cfg)
+
+    # Load partition keys (shared)
+    partition_keys = output_cfg.get("partition_keys", [])
+
+    # Load path template (shared, optional)
+    path_template = output_cfg.get("path_template")
+    if not path_template:
+        # Auto-generate default template
+        path_template = (
+            "data/curated/{domain}/{subdomain}/{schema_version}/"
+            + "/".join(f"{key}={{{key}}}" for key in partition_keys)
+        )
+
+    # Load multiple schemas
+    schemas_cfg = output_cfg.get("schemas", {})
+    contracts = []
+
+    for schema_name, schema_cfg in schemas_cfg.items():
+        schema_version = schema_cfg.get("version", "schema_v1")
+
+        required_columns = []
+        for col in schema_cfg.get("required_columns", []):
+            required_columns.append(
+                {
+                    "name": col["name"],
+                    "dtype": col["dtype"],
+                }
+            )
+
+        # Create contract for this schema
+        contract = DatasetContract(
+            dataset_type=base_dataset_type,
+            schema_version=schema_version,
+            required_columns=required_columns,
+            partition_keys=partition_keys,
+            path_template=path_template,
+        )
+        contracts.append(contract)
+
+    return contracts
 
 
 @dataclass
@@ -183,6 +348,8 @@ class SchemaLoader:
         """
         Build DatasetContract from parsed YAML schema.
 
+        Expects unified builder.yaml format with output.dataset and output.schema sections.
+
         Args:
             schema: Parsed YAML schema dictionary
             params: Parameter values
@@ -194,8 +361,11 @@ class SchemaLoader:
         if "parameters" in schema:
             self._validate_parameters(schema["parameters"], params)
 
+        # Load from unified format: output.dataset + output.schema
+        dataset_section = schema["output"]["dataset"]
+        contract_section = schema["output"]["schema"]
+
         # Parse dataset type
-        dataset_section = schema["dataset"]
         domain = self._parse_domain(dataset_section.get("domain"))
         asset_class = self._parse_asset_class(dataset_section.get("asset_class"))
         subdomain = self._parse_subdomain(dataset_section.get("subdomain"))
@@ -216,8 +386,7 @@ class SchemaLoader:
             frequency=frequency,
         )
 
-        # Parse contract section
-        contract_section = schema["contract"]
+        # Parse schema section
         schema_version = contract_section.get("schema_version", "schema_v1")
 
         # Parse columns (extract names and metadata)
@@ -262,8 +431,9 @@ class SchemaLoader:
                     example=filter_spec.get("example"),
                 )
 
-        partition_keys = tuple(contract_section.get("partition_keys", []))
-        path_template = contract_section.get("path_template", "")
+        # Get partition_keys and path_template from output level
+        partition_keys = tuple(schema["output"].get("partition_keys", []))
+        path_template = schema["output"].get("path_template", "")
 
         # Substitute parameters in path_template if needed
         path_template = self._substitute_template_params(path_template, params)

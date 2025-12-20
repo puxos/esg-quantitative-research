@@ -285,7 +285,7 @@ def run_builder(
     with open(builder_yaml, "r") as f:
         builder_config = yaml.safe_load(f)
 
-    output_type = dataset_type_from_config(builder_config["output"]["type"])
+    output_type = dataset_type_from_config(builder_config["output"]["dataset"])
 
     # Merge partition values into output type (e.g., frequency from partitions)
     if partitions:

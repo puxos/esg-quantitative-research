@@ -88,12 +88,18 @@ class DataBuilderBase(abc.ABC):
 
         try:
             # Validate enum values before conversion
-            validate_dataset_type_config(cfg["output"]["type"])
-            self.output_dt_template = dataset_type_from_config(cfg["output"]["type"])
+            output_cfg = cfg.get("output", {})
+            validate_dataset_type_config(output_cfg["dataset"])
+            self.output_dt_template = dataset_type_from_config(output_cfg["dataset"])
         except (EnumValidationError, ValueError) as e:
             raise ValueError(
                 f"Invalid dataset type in builder.yaml:\n{str(e)}\n"
-                f"Check your io.output.type section"
+                f"Check your output.dataset section"
+            )
+        except KeyError as e:
+            raise ValueError(
+                f"Missing output.dataset in builder.yaml\n"
+                f"Add output.dataset section with domain, subdomain, etc."
             )
 
         self.params = resolve_parameters(cfg.get("parameters", {}), overrides)

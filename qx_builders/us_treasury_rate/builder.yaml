@@ -8,16 +8,52 @@ builder:
     Fetches US Treasury constant maturity rates from Federal Reserve Economic Data (FRED).
     Supports multiple maturities (3-month through 30-year) with batch processing.
 
-# Input/Output specification
+# ==============================================================================
+# OUTPUT CONTRACT (unified from schema.yaml)
+# ==============================================================================
 output:
-  type:
+  # Dataset type
+  dataset:
     domain: reference-rates
     asset_class: fixed-income
     subdomain: yield-curves
     region: US # Hardcoded: US-specific (FRED API)
     frequency: null # Partitioned (daily/weekly/monthly)
 
-# Builder parameters
+  # Schema definition
+  schema:
+    version: schema_v1
+    required_columns:
+      - name: date
+        dtype: datetime64[ns]
+        description: Observation date
+      - name: rate_type
+        dtype: object
+        description: Treasury maturity (3month, 1year, 5year, 10year, 30year)
+      - name: series_id
+        dtype: object
+        description: FRED series ID (DGS3MO, DGS1, DGS5, DGS10, DGS30)
+      - name: rate
+        dtype: float64
+        description: Annualized yield percentage
+      - name: frequency
+        dtype: object
+        description: Data frequency (daily, weekly, monthly)
+      - name: source
+        dtype: object
+        description: Data source (FRED)
+
+  # Partitioning
+  partition_keys:
+    - rate_type
+    - frequency
+
+  # Path template (optional - can be auto-generated)
+  path_template: data/curated/{domain}/{subdomain}/treasury_rate/{schema_version}/rate_type={rate_type}/frequency={frequency}
+
+# ==============================================================================
+# BUILDER PARAMETERS
+# ==============================================================================
 parameters:
   # Date range
   start_date:
@@ -82,7 +118,9 @@ parameters:
     default: false
     description: If true, fail on any rate fetch error; if false, skip failed rates
 
-# Partition requirements
+# ==============================================================================
+# PARTITION REQUIREMENTS
+# ==============================================================================
 partitions:
   required:
     - region

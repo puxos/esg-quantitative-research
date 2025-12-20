@@ -57,11 +57,46 @@ class MarketESGRegressionModel(BaseModel):
         logger.info("Two-Factor Regression Model - Execution Started")
         logger.info("=" * 80)
 
-        # Extract inputs
+        # Extract inputs from curated storage
         equity_prices = inputs["equity_prices"]
         market_prices = inputs["market_prices"]
-        esg_factors = inputs["esg_factors"]
         rf_df = inputs["risk_free"]
+
+        # Load ESG factors from processed storage (not curated)
+        # ESG factors come from BuildESGFactor model output
+        if "esg_factors" in inputs and inputs["esg_factors"] is not None:
+            # If provided through normal input loading (shouldn't happen)
+            esg_factors = inputs["esg_factors"]
+        else:
+            # Load from processed storage using run_id
+            run_id = kwargs.get("run_id")
+            if not run_id:
+                raise ValueError(
+                    "run_id is required to load ESG factors from processed storage"
+                )
+
+            # Read from processed storage: data/processed/factor-returns/model=esg_factor_model/run_date=*/
+            from pathlib import Path
+
+            import pandas as pd
+
+            processed_base = Path("data/processed/factor-returns")
+            factor_files = list(
+                processed_base.glob("model=esg_factor_model/run_date=*/*.parquet")
+            )
+
+            if not factor_files:
+                raise FileNotFoundError(
+                    f"No ESG factor files found in {processed_base}/model=esg_factor_model/. "
+                    "Make sure BuildESGFactor has run first."
+                )
+
+            # Read most recent factor file (or filter by run_id if needed)
+            # For now, read the most recent file
+            latest_file = max(factor_files, key=lambda p: p.stat().st_mtime)
+            esg_factors = pd.read_parquet(latest_file)
+            logger.info(f"📊 Loaded ESG factors from: {latest_file}")
+            logger.info(f"   ESG factor rows: {len(esg_factors)}")
 
         # Extract parameters
         esg_factor_name = params["esg_factor_name"]

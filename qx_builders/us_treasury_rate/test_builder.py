@@ -391,7 +391,7 @@ def test_output_schema_validation(builder, sample_raw_data):
 
 @pytest.mark.integration
 def test_build_with_partitions(builder_with_api_key):
-    """Test full build pipeline with region partition."""
+    """Test full build pipeline with region and frequency partitions."""
     import os
 
     api_key = os.environ.get("FRED_API_KEY")
@@ -401,11 +401,10 @@ def test_build_with_partitions(builder_with_api_key):
 
     # Build with small date range
     result = builder_with_api_key.build(
-        partitions={"region": "US"},
+        partitions={"region": "US", "frequency": "monthly"},
         rate_types=["10year"],
         start_date="2023-01-01",
         end_date="2023-01-31",
-        frequency="monthly",
     )
 
     assert result is not None

@@ -3,13 +3,42 @@ builder:
   version: 1.0.0
   description: "GVKEY-ticker mapping builder - creates mapping from GVKEY identifiers to ticker symbols"
 
+# ==============================================================================
+# OUTPUT CONTRACT (unified from schema.yaml)
+# ==============================================================================
 output:
-  type:
+  # Dataset type
+  dataset:
     domain: instrument-reference
     asset_class: null
     subdomain: identifiers
+    region: null
     frequency: null
 
+  # Schema definition
+  schema:
+    version: schema_v1
+    required_columns:
+      - name: gvkey
+        dtype: int64
+        description: Global Company Key (stable identifier from Compustat)
+      - name: ticker
+        dtype: object
+        description: Normalized ticker symbol (e.g., BRK-B)
+      - name: ticker_raw
+        dtype: object
+        description: Original ticker from source (e.g., BRK.B)
+
+  # Partitioning
+  partition_keys:
+    - exchange
+
+  # Path template
+  path_template: data/curated/{domain}/{subdomain}/gvkey/{schema_version}/exchange={exchange}
+
+# ==============================================================================
+# BUILDER PARAMETERS
+# ==============================================================================
 parameters:
   exchange:
     type: string
@@ -27,6 +56,9 @@ parameters:
     allowed: ["append", "overwrite"]
     description: "Write mode - overwrite deletes existing files, append keeps them"
 
+# ==============================================================================
+# PARTITION REQUIREMENTS
+# ==============================================================================
 partitions:
   required:
     - exchange

@@ -2,16 +2,16 @@
 ESG Score Schema
 
 Dataset contract for ESG (Environmental, Social, Governance) scores.
-Loaded from YAML schema definition.
+Loaded from unified builder.yaml configuration.
 """
 
 from pathlib import Path
 
 from qx.common.contracts import DatasetContract
-from qx.common.schema_loader import load_contract
+from qx.common.schema_loader import load_contract_from_builder_yaml
 
-# Path to YAML schema file
-SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
+# Path to unified builder YAML file
+BUILDER_YAML_PATH = Path(__file__).parent / "builder.yaml"
 
 
 def get_contracts() -> list[DatasetContract]:
@@ -24,7 +24,7 @@ def get_contracts() -> list[DatasetContract]:
         List containing single DatasetContract for ESG scores
 
     Schema:
-        - 7 columns: ticker, gvkey, esg_year, esg_score,
+        - 8 columns: ticker, gvkey, esg_year, year, esg_score,
           environmental_pillar_score, social_pillar_score, governance_pillar_score
         - Partitioned by: exchange, esg_year
         - Frequency: Annual (one record per company per ESG publication year)
@@ -35,4 +35,4 @@ def get_contracts() -> list[DatasetContract]:
         contracts = get_contracts()
         # → [DatasetContract for annual ESG scores]
     """
-    return [load_contract(SCHEMA_PATH)]
+    return [load_contract_from_builder_yaml(BUILDER_YAML_PATH)]

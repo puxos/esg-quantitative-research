@@ -2,16 +2,16 @@
 GVKEY Mapping Schema
 
 Dataset contract for GVKEY-to-ticker mapping metadata.
-Loaded from YAML schema definition.
+Loaded from unified builder.yaml definition.
 """
 
 from pathlib import Path
 
 from qx.common.contracts import DatasetContract
-from qx.common.schema_loader import load_contract
+from qx.common.schema_loader import load_contract_from_builder_yaml
 
-# Path to YAML schema file
-SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
+# Path to unified YAML file
+BUILDER_YAML_PATH = Path(__file__).parent / "builder.yaml"
 
 
 def get_contracts() -> list[DatasetContract]:
@@ -37,4 +37,4 @@ def get_contracts() -> list[DatasetContract]:
         contracts = get_contracts()
         # → [DatasetContract for US GVKEY mapping]
     """
-    return [load_contract(SCHEMA_PATH, exchange="US")]
+    return [load_contract_from_builder_yaml(BUILDER_YAML_PATH)]

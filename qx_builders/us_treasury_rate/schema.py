@@ -2,21 +2,21 @@
 US Treasury Rate Schema
 
 Dataset contract for US Treasury rates from FRED API.
-Loaded from YAML schema definition.
+Loaded from unified builder.yaml definition.
 """
 
 from pathlib import Path
 
 from qx.common.contracts import DatasetContract
-from qx.common.schema_loader import load_contract
+from qx.common.schema_loader import load_contract_from_builder_yaml
 
-# Path to YAML schema file
-SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
+# Path to unified YAML file
+BUILDER_YAML_PATH = Path(__file__).parent / "builder.yaml"
 
 
 def _get_base_contract() -> DatasetContract:
-    """Get base contract from YAML schema (internal helper)."""
-    return load_contract(SCHEMA_PATH)
+    """Get base contract from unified builder.yaml (internal helper)."""
+    return load_contract_from_builder_yaml(BUILDER_YAML_PATH)
 
 
 def get_contracts() -> list[DatasetContract]:

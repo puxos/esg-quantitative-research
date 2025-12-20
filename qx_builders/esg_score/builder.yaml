@@ -9,14 +9,104 @@ builder:
     Maps GVKEY company identifiers to ticker symbols and resolves corporate actions.
     Supports batch processing by year range.
 
-# Input/Output specification
+# ============================================================================
+# OUTPUT: Dataset definition and schema
+# ============================================================================
 output:
-  type:
+  # Dataset identity
+  dataset:
     domain: esg
     asset_class: equity
     subdomain: esg-scores
     region: null
     frequency: yearly # ESG scores are annual (one record per company per year)
+
+  # Schema definition
+  schema:
+    schema_version: schema_v1
+
+    columns:
+      - name: ticker
+        type: string
+        description: Stock ticker symbol (mapped from GVKEY)
+        required: true
+        filterable: true
+        filter_type: in
+
+      - name: gvkey
+        type: int
+        description: Global Company Key (stable identifier)
+        required: true
+        filterable: true
+        filter_type: in
+
+      - name: esg_year
+        type: int
+        description: ESG score publication year (e.g., 2023 = scores published in 2023)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: year
+        type: int
+        description: Calendar year when ESG data becomes available for trading (year = esg_year + 1)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: esg_score
+        type: float
+        description: Composite ESG score (0-100)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: environmental_pillar_score
+        type: float
+        description: Environmental component score
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: social_pillar_score
+        type: float
+        description: Social component score
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: governance_pillar_score
+        type: float
+        description: Governance component score
+        required: true
+        filterable: true
+        filter_type: range
+
+    filters:
+      esg_year_range:
+        columns: [esg_year]
+        type: range
+        description: Filter by ESG publication year range
+        example: [2020, 2024]
+
+      ticker_list:
+        columns: [ticker]
+        type: in
+        description: Filter to specific tickers
+        example: ["AAPL", "MSFT", "GOOGL"]
+
+      score_threshold:
+        columns: [esg_score]
+        type: range
+        description: Filter by ESG score range
+        example: [70, 100]
+
+  # Partition and path configuration
+  partition_keys:
+    - exchange
+    - esg_year
+
+  path_template: data/curated/esg/esg_scores/{schema_version}/exchange={exchange}/esg_year={esg_year}
 
 # Builder parameters
 parameters:

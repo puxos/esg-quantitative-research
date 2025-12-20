@@ -3,14 +3,56 @@ builder:
   version: 1.0.0
   description: "S&P 500 historical membership builder - transforms raw CSV into curated daily membership data"
 
+# ==============================================================================
+# OUTPUT CONTRACT (unified from schema_daily.yaml and schema_intervals.yaml)
+# ==============================================================================
 output:
-  type:
+  # Dataset type (shared by both modes)
+  dataset:
     domain: instrument-reference
     asset_class: null
     subdomain: index-constituents
     region: null
     frequency: null
 
+  # Schema definitions (mode-specific)
+  schemas:
+    daily:
+      version: schema_v1
+      description: "Point-in-time membership tracking (date, ticker pairs)"
+      required_columns:
+        - name: date
+          dtype: datetime64[ns]
+          description: Observation date
+        - name: ticker
+          dtype: object
+          description: Stock ticker symbol
+
+    intervals:
+      version: schema_v1
+      description: "Interval-based membership tracking (ticker, start_date, end_date)"
+      required_columns:
+        - name: ticker
+          dtype: object
+          description: Stock ticker symbol
+        - name: start_date
+          dtype: datetime64[ns]
+          description: Membership start date (inclusive)
+        - name: end_date
+          dtype: datetime64[ns]
+          description: Membership end date (inclusive)
+
+  # Partitioning (shared)
+  partition_keys:
+    - universe
+    - mode
+
+  # Path template (shared)
+  path_template: data/curated/{domain}/{subdomain}/{schema_version}/universe={universe}/mode={mode}
+
+# ==============================================================================
+# BUILDER PARAMETERS
+# ==============================================================================
 parameters:
   min_date:
     type: string
@@ -33,6 +75,9 @@ parameters:
     allowed: ["append", "overwrite"]
     description: "Write mode - overwrite deletes existing files, append keeps them"
 
+# ==============================================================================
+# PARTITION REQUIREMENTS
+# ==============================================================================
 partitions:
   required:
     - universe

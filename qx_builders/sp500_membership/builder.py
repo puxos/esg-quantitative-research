@@ -64,15 +64,26 @@ class SP500MembershipBuilder(DataBuilderBase):
         partitions = partitions or {}
         mode = partitions.get("mode", "daily")
 
-        # Select appropriate contract based on mode
+        # Get all contracts and select appropriate one based on mode
+        from qx_builders.sp500_membership.schema import get_contracts
+
+        contracts = get_contracts()
+
+        # Select contract based on schema columns (daily has 'date', intervals has 'start_date')
         if mode == "intervals":
-            from qx_builders.sp500_membership.schema import get_sp500_intervals_contract
-
-            self.contract = get_sp500_intervals_contract()
+            # Intervals contract has 'start_date' and 'end_date' columns
+            self.contract = next(
+                c
+                for c in contracts
+                if any(col["name"] == "start_date" for col in c.required_columns)
+            )
         else:  # daily mode
-            from qx_builders.sp500_membership.schema import get_sp500_daily_contract
-
-            self.contract = get_sp500_daily_contract()
+            # Daily contract has 'date' column
+            self.contract = next(
+                c
+                for c in contracts
+                if any(col["name"] == "date" for col in c.required_columns)
+            )
 
         # Now call parent's build() which will use our selected contract
         return super().build(partitions=partitions, **kwargs)

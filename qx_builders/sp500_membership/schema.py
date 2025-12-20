@@ -2,27 +2,16 @@
 S&P 500 Membership Schema
 
 Dataset contracts for S&P 500 membership data (daily and intervals).
-Loaded from YAML schema definitions.
+Loaded from unified builder.yaml definition.
 """
 
 from pathlib import Path
 
 from qx.common.contracts import DatasetContract
-from qx.common.schema_loader import load_contract
+from qx.common.schema_loader import load_contracts_from_builder_yaml
 
-# Paths to YAML schema files
-SCHEMA_DAILY_PATH = Path(__file__).parent / "schema_daily.yaml"
-SCHEMA_INTERVALS_PATH = Path(__file__).parent / "schema_intervals.yaml"
-
-
-def _get_daily_contract() -> DatasetContract:
-    """Get contract for daily membership (internal helper)."""
-    return load_contract(SCHEMA_DAILY_PATH)
-
-
-def _get_intervals_contract() -> DatasetContract:
-    """Get contract for interval membership (internal helper)."""
-    return load_contract(SCHEMA_INTERVALS_PATH)
+# Path to unified YAML file
+BUILDER_YAML_PATH = Path(__file__).parent / "builder.yaml"
 
 
 def get_contracts() -> list[DatasetContract]:
@@ -42,6 +31,6 @@ def get_contracts() -> list[DatasetContract]:
 
     Example:
         contracts = get_contracts()
-        # → [daily contract, intervals contract]
+        # → [daily_contract, intervals_contract]
     """
-    return [_get_daily_contract(), _get_intervals_contract()]
+    return load_contracts_from_builder_yaml(BUILDER_YAML_PATH)

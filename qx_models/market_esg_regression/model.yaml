@@ -27,66 +27,66 @@ model:
 inputs:
   # Input 1: Stock prices (for individual stock returns)
   - name: equity_prices
-      required: true
-      type:
-        domain: market-data
-        asset_class: equity
-        subdomain: bars
-        region: US
-        frequency: daily
-      description: "Daily stock OHLCV data (will be resampled to monthly)"
+    required: true
+    type:
+      domain: market-data
+      asset_class: equity
+      subdomain: bars
+      frequency: monthly
+    description: "Monthly stock OHLCV data for calculating returns"
 
-    # Input 2: Market prices (SPY for market returns)
-    - name: market_prices
-      required: true
-      type:
-        domain: market-data
-        asset_class: equity
-        subdomain: bars
-        region: US
-        frequency: monthly
-      description: "Monthly SPY bar data (market proxy)"
+  # Input 2: Market prices (SPY for market returns)
+  - name: market_prices
+    required: true
+    type:
+      domain: market-data
+      asset_class: equity
+      subdomain: bars
+      frequency: monthly
+    description: "Monthly SPY bar data (market proxy)"
 
-    # Input 3: ESG factors (from ESGFactorModel)
-    - name: esg_factors
-      required: true
-      type:
-        domain: derived-metrics
-        asset_class: equity
-        subdomain: factors
-        region: null
-        frequency: monthly
-      description: "Monthly ESG factor returns (output from ESGFactorModel)"
+  # Input 3: ESG factors (from ESGFactorModel in processed storage)
+  # Note: Set required=false because this comes from processed storage, not curated
+  # Model will load manually from processed storage using run_id
+  - name: esg_factors
+    required: false
+    type:
+      domain: derived-metrics
+      asset_class: equity
+      subdomain: factors
+      region: null
+      frequency: monthly
+    description: "Monthly ESG factor returns (output from ESGFactorModel in processed storage)"
 
-    # Input 4: Risk-free rate
-    - name: risk_free
-      required: true
-      type:
-        domain: reference-rates
-        asset_class: fixed-income
-        subdomain: yield-curves
-        region: US
-        frequency: monthly
-      description: "Monthly risk-free rates"
+  # Input 4: Risk-free rate
+  - name: risk_free
+    required: true
+    type:
+      domain: reference-rates
+      asset_class: fixed-income
+      subdomain: yield-curves
+      region: US
+      frequency: monthly
+    description: "Monthly risk-free rates"
 
 output:
   type:
     domain: derived-metrics
-      asset_class: equity
-      subdomain: factor-exposures
-      subtype: market-esg-regression
-      region: null
-      frequency: monthly
-    description: |
-      Factor exposures (betas) and alpha from two-factor regression.
+    asset_class: equity
+    subdomain: factor-exposures
+    subtype: market-esg-regression
+    region: null
+    frequency: monthly
+  description: |
+    Factor exposures (betas) and alpha from two-factor regression.
 
-      Cross-sectional output (window=null):
-        - One row per stock with full-sample estimates
-        - Columns: symbol, alpha, beta_market, beta_esg, statistics
+    Cross-sectional output (window=null):
+      - One row per stock with full-sample estimates
+      - Columns: symbol, alpha, beta_market, beta_esg, statistics
 
-      Time-series output (window specified):
-        - Multiple rows per stock (rolling window estimates)
-        - Columns: symbol, date, alpha, beta_market, beta_esg, statistics
+    Time-series output (window specified):
+      - Multiple rows per stock (rolling window estimates)
+      - Columns: symbol, date, alpha, beta_market, beta_esg, statistics
 
 parameters:
   esg_factor_name:

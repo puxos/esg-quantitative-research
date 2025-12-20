@@ -3,21 +3,207 @@ builder:
   version: 1.0.0
   description: "Tiingo OHLCV price data builder - fetches equity price data from Tiingo API"
 
+# ============================================================================
+# OUTPUT: Dataset definition and schema (unified format for builder)
+# ============================================================================
 output:
-  type:
+  # Dataset identity
+  dataset:
     domain: market-data
     asset_class: equity
     subdomain: bars
     frequency: null # Partitioned separately
 
+  # Schema definition
+  schema:
+    schema_version: schema_v1
+
+    columns:
+      - name: date
+        type: date
+        description: Trading date
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: exchange
+        type: string
+        description: Exchange identifier (e.g., US, NASDAQ, NYSE)
+        required: true
+        filterable: true
+        filter_type: in
+
+      - name: symbol
+        type: string
+        description: Ticker symbol
+        required: true
+        filterable: true
+        filter_type: in
+
+      - name: currency
+        type: string
+        description: Currency code (e.g., USD, HKD)
+        required: true
+        filterable: true
+        filter_type: in
+
+      - name: frequency
+        type: string
+        description: Data frequency (daily, weekly, monthly)
+        required: true
+        filterable: false
+
+      - name: open
+        type: float
+        description: Opening price
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: high
+        type: float
+        description: High price
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: low
+        type: float
+        description: Low price
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: close
+        type: float
+        description: Closing price
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: volume
+        type: int
+        description: Trading volume
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: adj_open
+        type: float
+        description: Adjusted opening price (splits & dividends)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: adj_high
+        type: float
+        description: Adjusted high price
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: adj_low
+        type: float
+        description: Adjusted low price
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: adj_close
+        type: float
+        description: Adjusted closing price
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: adj_volume
+        type: int
+        description: Adjusted volume
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: div_cash
+        type: float
+        description: Cash dividend amount
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: split_factor
+        type: float
+        description: Stock split factor
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: source
+        type: string
+        description: Data source (tiingo)
+        required: true
+        filterable: false
+
+    filters:
+      date_range:
+        columns: [date]
+        type: range
+        description: Filter by trading date range
+        example: ["2020-01-01", "2024-12-31"]
+
+      symbol_list:
+        columns: [symbol]
+        type: in
+        description: Filter to specific symbols
+        example: ["AAPL", "MSFT", "GOOGL"]
+
+      price_range:
+        columns: [adj_close]
+        type: range
+        description: Filter by adjusted closing price range
+        example: [100, 500]
+
+      volume_threshold:
+        columns: [volume]
+        type: range
+        description: Filter by trading volume threshold
+        example: [1000000, null]
+
+  # Partition and path configuration
+  partition_keys:
+    - exchange
+    - frequency
+    - symbol
+    - year
+
+  path_template: data/curated/market-data/ohlcv/{schema_version}/exchange={exchange}/frequency={frequency}/symbol={symbol}/year={year}
+
+# ============================================================================
+# PARAMETERS: Builder configuration AND contract parameterization
+# ============================================================================
 parameters:
-  # Required parameters (no defaults)
+  # Contract parameterization (for load_contract with exchange/frequency)
+  exchange:
+    type: enum
+    values: [US, NYSE, NASDAQ, HKEX, LSE] # For contract loader
+    allowed: [US, NYSE, NASDAQ, HKEX, LSE] # For builder validation
+    required: false # Not required for builder (has default)
+    default: "US"
+    description: "Exchange identifier (US, NYSE, NASDAQ, HK)"
+
+  frequency:
+    type: enum
+    values: [daily, weekly, monthly, yearly] # For contract loader
+    allowed: [daily, weekly, monthly, yearly] # For builder validation
+    required: false # Not required for builder (has default)
+    default: "daily"
+    description: "Data frequency for OHLCV prices"
+
+  # Builder runtime parameters (not needed for contract loading)
   symbols:
     type: list
-    required: true
+    required: false # Not required during contract loading, only during builder runtime
     description: "List of ticker symbols to fetch (e.g., ['AAPL', 'MSFT', 'GOOGL'])"
 
-  # Date range
   start_date:
     type: string
     required: false
@@ -29,20 +215,6 @@ parameters:
     required: false
     default: null
     description: "End date for fetching price data (ISO format YYYY-MM-DD). null = today"
-
-  # Data configuration
-  frequency:
-    type: enum
-    required: false
-    default: "daily"
-    allowed: ["daily", "weekly", "monthly", "yearly"]
-    description: "Data frequency for OHLCV prices"
-
-  exchange:
-    type: string
-    required: false
-    default: "US"
-    description: "Exchange identifier (US, NYSE, NASDAQ, HK)"
 
   currency:
     type: string
@@ -56,7 +228,6 @@ parameters:
     allowed: ["append", "overwrite"]
     description: "Write mode - overwrite deletes existing files, append keeps them"
 
-  # Optional features
   market_proxy_symbols:
     type: list
     required: false
@@ -69,14 +240,12 @@ parameters:
     default: true
     description: "Enable ticker resolution for corporate actions (FB→META, CBS→PARA)"
 
-  # API authentication
   tiingo_api_key:
     type: string
     required: false
     default: null
     description: "Tiingo API key (or use TIINGO_API_KEY env var)"
 
-  # Advanced options
   fail_on_error:
     type: bool
     required: false
@@ -95,12 +264,18 @@ parameters:
     default: null
     description: "Custom tolerance in days (null = auto: daily=2, weekly=6, monthly=3)"
 
+# ============================================================================
+# PARTITIONS: Partition configuration
+# ============================================================================
 partitions:
   required: [exchange, frequency]
   defaults:
     exchange: US
     frequency: daily
 
+# ============================================================================
+# EXAMPLES: Usage examples
+# ============================================================================
 examples:
   - description: "Fetch daily prices for tech stocks (2020-2024)"
     partitions:

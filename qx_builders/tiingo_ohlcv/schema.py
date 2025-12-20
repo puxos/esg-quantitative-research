@@ -2,7 +2,7 @@
 Tiingo Price Data Schema
 
 Dataset contract for equity OHLCV data from Tiingo API.
-Loaded from YAML schema definition.
+Loaded from unified builder.yaml configuration.
 """
 
 from pathlib import Path
@@ -11,13 +11,13 @@ from qx.common.contracts import DatasetContract
 from qx.common.schema_loader import load_contract
 from qx.common.types import Frequency
 
-# Path to YAML schema file
-SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
+# Path to unified builder YAML file (backward compatible with load_contract)
+BUILDER_YAML_PATH = Path(__file__).parent / "builder.yaml"
 
 
 def _get_contract(exchange: str, frequency: Frequency) -> DatasetContract:
     """Get contract for specific exchange and frequency (internal helper)."""
-    return load_contract(SCHEMA_PATH, exchange=exchange, frequency=frequency)
+    return load_contract(BUILDER_YAML_PATH, exchange=exchange, frequency=frequency)
 
 
 def get_contracts() -> list[DatasetContract]:
