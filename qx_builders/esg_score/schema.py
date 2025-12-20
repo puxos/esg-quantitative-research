@@ -8,7 +8,7 @@ Loaded from unified builder.yaml configuration.
 from pathlib import Path
 
 from qx.common.contracts import DatasetContract
-from qx.common.schema_loader import load_contract_from_builder_yaml
+from qx.common.schema_loader import load_contract
 
 # Path to unified builder YAML file
 BUILDER_YAML_PATH = Path(__file__).parent / "builder.yaml"
@@ -35,4 +35,4 @@ def get_contracts() -> list[DatasetContract]:
         contracts = get_contracts()
         # → [DatasetContract for annual ESG scores]
     """
-    return [load_contract_from_builder_yaml(BUILDER_YAML_PATH)]
+    return [load_contract(BUILDER_YAML_PATH)]

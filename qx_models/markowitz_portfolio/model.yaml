@@ -128,6 +128,206 @@ output:
 
     Output frequency: As-requested (typically monthly rebalancing)
 
+  # Schema definition
+  schema:
+    schema_version: schema_v1
+
+    columns:
+      - name: symbol
+        type: string
+        description: Stock ticker symbol
+        required: true
+        filterable: true
+        filter_type: in
+
+      - name: optimization_date
+        type: date
+        description: Date when portfolio was optimized
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: weight
+        type: float
+        description: Optimal allocation weight (0-1, sums to 1 across portfolio)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: exp_return_monthly
+        type: float
+        description: Expected return (monthly decimal)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: exp_return_annual
+        type: float
+        description: Expected return (annualized)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: esg_beta
+        type: float
+        description: ESG exposure (β_ESG)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: sector
+        type: string
+        description: GICS sector (if available)
+        required: false
+        filterable: true
+        filter_type: in
+
+      - name: portfolio_return_monthly
+        type: float
+        description: Portfolio expected return (monthly decimal, same for all rows)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: portfolio_return_annual
+        type: float
+        description: Portfolio expected return (annualized, same for all rows)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: portfolio_vol_monthly
+        type: float
+        description: Portfolio volatility (monthly std dev, same for all rows)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: portfolio_vol_annual
+        type: float
+        description: Portfolio volatility (annualized std dev, same for all rows)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: portfolio_sharpe
+        type: float
+        description: Portfolio Sharpe ratio (same for all rows)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: portfolio_esg_exposure
+        type: float
+        description: Portfolio ESG exposure (β_ESG'w, same for all rows)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: portfolio_concentration_top10
+        type: float
+        description: Weight in top 10 holdings (same for all rows)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: n_positions
+        type: int
+        description: Number of active positions (same for all rows)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: gamma
+        type: float
+        description: Risk aversion parameter used in optimization
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: esg_lower_bound
+        type: float
+        description: ESG lower bound constraint (null if not used)
+        required: false
+        filterable: false
+
+      - name: esg_upper_bound
+        type: float
+        description: ESG upper bound constraint (null if not used)
+        required: false
+        filterable: false
+
+      - name: solver
+        type: string
+        description: Optimization solver used (e.g., ECOS, SCS, OSQP)
+        required: true
+        filterable: true
+        filter_type: in
+
+      - name: model
+        type: string
+        description: Model ID (auto-added by BaseModel)
+        required: true
+        filterable: true
+        filter_type: in
+
+      - name: model_version
+        type: string
+        description: Model version (auto-added by BaseModel)
+        required: true
+        filterable: false
+
+      - name: featureset_id
+        type: string
+        description: Input featureset ID (auto-added by BaseModel)
+        required: true
+        filterable: false
+
+      - name: run_id
+        type: string
+        description: Unique run identifier (auto-added by BaseModel)
+        required: true
+        filterable: false
+
+      - name: run_ts
+        type: string
+        description: Run timestamp ISO 8601 (auto-added by BaseModel)
+        required: true
+        filterable: true
+        filter_type: range
+
+    partition_keys:
+      - output_type
+      - model
+      - run_date
+
+    filters:
+      symbol_list:
+        columns: [symbol]
+        type: in
+        description: Filter to specific symbols
+        example: ["AAPL", "MSFT", "GOOGL"]
+
+      optimization_date_range:
+        columns: [optimization_date]
+        type: range
+        description: Filter by optimization date range
+        example: ["2020-01-01", "2024-12-31"]
+
+      weight_threshold:
+        columns: [weight]
+        type: range
+        description: Filter by position weight
+        example: [0.01, 1.0]
+
+      sector_list:
+        columns: [sector]
+        type: in
+        description: Filter to specific sectors
+        example: ["Technology", "Healthcare"]
+
+    path_template: data/processed/{output_type}/model={model}/run_date={run_date}
+
 parameters:
   # Risk aversion (mean-variance tradeoff)
   gamma:

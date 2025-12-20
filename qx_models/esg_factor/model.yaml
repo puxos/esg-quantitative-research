@@ -71,6 +71,7 @@ inputs:
       Enables automatic filtering to ESG-continuous universe.
 
 output:
+  # Dataset identity
   type:
     domain: derived-metrics
     asset_class: equity
@@ -78,6 +79,188 @@ output:
     subtype: esg-factors
     region: null
     frequency: null
+
+  # Schema definition
+  schema:
+    schema_version: schema_v1
+
+    columns:
+      - name: date
+        type: date
+        description: Monthly observation date
+        required: true
+        filterable: true
+        filter_type: range
+
+      # ESG Factor (composite score)
+      - name: ESG_long
+        type: float
+        description: ESG factor long leg return
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: ESG_short
+        type: float
+        description: ESG factor short leg return
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: ESG_factor
+        type: float
+        description: ESG factor long-short return
+        required: false
+        filterable: true
+        filter_type: range
+
+      # Environmental Factor
+      - name: E_long
+        type: float
+        description: Environmental factor long leg return
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: E_short
+        type: float
+        description: Environmental factor short leg return
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: E_factor
+        type: float
+        description: Environmental factor long-short return
+        required: false
+        filterable: true
+        filter_type: range
+
+      # Social Factor
+      - name: S_long
+        type: float
+        description: Social factor long leg return
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: S_short
+        type: float
+        description: Social factor short leg return
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: S_factor
+        type: float
+        description: Social factor long-short return
+        required: false
+        filterable: true
+        filter_type: range
+
+      # Governance Factor
+      - name: G_long
+        type: float
+        description: Governance factor long leg return
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: G_short
+        type: float
+        description: Governance factor short leg return
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: G_factor
+        type: float
+        description: Governance factor long-short return
+        required: false
+        filterable: true
+        filter_type: range
+
+      # ESG Momentum Factor
+      - name: ESG_mom_long
+        type: float
+        description: ESG momentum factor long leg return
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: ESG_mom_short
+        type: float
+        description: ESG momentum factor short leg return
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: ESG_mom_factor
+        type: float
+        description: ESG momentum factor long-short return
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: model
+        type: string
+        description: Model ID (auto-added by BaseModel)
+        required: true
+        filterable: true
+        filter_type: in
+
+      - name: model_version
+        type: string
+        description: Model version (auto-added by BaseModel)
+        required: true
+        filterable: false
+
+      - name: featureset_id
+        type: string
+        description: Input featureset ID (auto-added by BaseModel)
+        required: true
+        filterable: false
+
+      - name: run_id
+        type: string
+        description: Unique run identifier (auto-added by BaseModel)
+        required: true
+        filterable: false
+
+      - name: run_ts
+        type: string
+        description: Run timestamp ISO 8601 (auto-added by BaseModel)
+        required: true
+        filterable: true
+        filter_type: range
+
+    filters:
+      date_range:
+        columns: [date]
+        type: range
+        description: Filter by observation date range
+        example: ["2020-01-01", "2024-12-31"]
+
+      factor_list:
+        columns: [factor_name]
+        type: in
+        description: Filter to specific factors
+        example: ["ESG", "E", "S"]
+
+      return_range:
+        columns: [factor_return]
+        type: range
+        description: Filter by factor return range
+        example: [-0.05, 0.05]
+
+  # Partition and path configuration
+  partition_keys:
+    - output_type
+    - model
+    - run_date
+
+  path_template: data/processed/{output_type}/model={model}/run_date={run_date}
+
   description: |
     Monthly ESG factor returns (excess returns, risk-free adjusted).
 

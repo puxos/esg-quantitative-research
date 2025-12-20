@@ -2,6 +2,7 @@
 ESG Factor Model - Output Schema Definition
 
 Defines the output contract for ESG factor returns.
+Loaded from unified model.yaml configuration.
 """
 
 from pathlib import Path
@@ -9,8 +10,8 @@ from pathlib import Path
 from qx.common.contracts import DatasetContract
 from qx.common.schema_loader import load_contract
 
-# Path to YAML schema definition
-SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
+# Path to unified model YAML file
+MODEL_YAML_PATH = Path(__file__).parent / "model.yaml"
 
 
 def get_contracts() -> list[DatasetContract]:
@@ -26,4 +27,4 @@ def get_contracts() -> list[DatasetContract]:
     Returns:
         List containing single DatasetContract for processed/equity/factors
     """
-    return [load_contract(SCHEMA_PATH)]
+    return [load_contract(MODEL_YAML_PATH)]

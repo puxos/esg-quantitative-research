@@ -99,8 +99,8 @@ class TypedCuratedLoader:
                 filters=[('ticker', 'in', ['AAPL', 'MSFT', 'GOOGL'])]
             )
         """
-        # Resolve contract from registry
-        contract = self.registry.find(dataset_type)
+        # Resolve contract from registry (use find_matching to support partitioned dimensions)
+        contract = self.registry.find_matching(dataset_type)
 
         # Build storage path from contract + partitions
         # May contain wildcards (*) for missing partition keys

@@ -8,7 +8,7 @@ from qx.common.contracts import DatasetContract
 from qx.common.schema_loader import load_contract
 
 # Path to YAML schema definition
-SCHEMA_PATH = Path(__file__).parent / "schema.yaml"
+MODEL_YAML_PATH = Path(__file__).parent / "model.yaml"
 
 
 def get_contracts() -> list[DatasetContract]:
@@ -64,4 +64,4 @@ def get_contracts() -> list[DatasetContract]:
     Returns:
         List containing single DatasetContract for factor expected returns output
     """
-    return [load_contract(SCHEMA_PATH)]
+    return [load_contract(MODEL_YAML_PATH)]

@@ -2,211 +2,45 @@
 Schema Loader
 
 Loads dataset contracts from YAML schema definitions.
-Provides type-safe contract generation from declarative schemas.
-Supports unified builder.yaml format with output.dataset structure.
+Unified format supporting builders (output.dataset) and models (output.type).
 """
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import yaml
 
 from qx.common.contracts import DatasetContract
-from qx.common.enum_validator import validate_dataset_type_config
 from qx.common.types import (
     AssetClass,
     DatasetType,
     Domain,
-    Exchange,
     Frequency,
     Region,
     Subdomain,
-    dataset_type_from_config,
 )
-
-
-def load_contract_from_builder_yaml(yaml_path: Path) -> DatasetContract:
-    """
-    Load dataset contract from unified builder.yaml structure.
-
-    New unified format with output.dataset, output.schema, and output.partition_keys.
-
-    Args:
-        yaml_path: Path to builder.yaml file
-
-    Returns:
-        DatasetContract instance
-
-    Example builder.yaml structure:
-        output:
-          dataset:
-            domain: reference-rates
-            subdomain: yield-curves
-            frequency: null
-          schema:
-            version: schema_v1
-            required_columns:
-              - name: date
-                dtype: datetime64[ns]
-          partition_keys:
-            - rate_type
-            - frequency
-          path_template: "..."
-    """
-    with open(yaml_path) as f:
-        cfg = yaml.safe_load(f)
-
-    output_cfg = cfg.get("output", {})
-
-    # Load dataset type from output.dataset
-    dataset_cfg = output_cfg.get("dataset", {})
-    validate_dataset_type_config(dataset_cfg)
-    dataset_type = dataset_type_from_config(dataset_cfg)
-
-    # Load schema from output.schema
-    schema_cfg = output_cfg.get("schema", {})
-    schema_version = schema_cfg.get("version", "schema_v1")
-
-    required_columns = []
-    for col in schema_cfg.get("required_columns", []):
-        required_columns.append(
-            {
-                "name": col["name"],
-                "dtype": col["dtype"],
-            }
-        )
-
-    # Load partition keys
-    partition_keys = output_cfg.get("partition_keys", [])
-
-    # Load path template (optional)
-    path_template = output_cfg.get("path_template")
-    if not path_template:
-        # Auto-generate default template
-        path_template = (
-            "data/curated/{domain}/{subdomain}/{schema_version}/"
-            + "/".join(f"{key}={{{key}}}" for key in partition_keys)
-        )
-
-    return DatasetContract(
-        dataset_type=dataset_type,
-        schema_version=schema_version,
-        required_columns=required_columns,
-        partition_keys=partition_keys,
-        path_template=path_template,
-    )
-
-
-def load_contracts_from_builder_yaml(yaml_path: Path) -> list[DatasetContract]:
-    """
-    Load multiple dataset contracts from unified builder.yaml with multiple schemas.
-
-    For builders that produce different schemas based on mode (e.g., daily vs intervals),
-    the builder.yaml can define multiple schemas under output.schemas.
-
-    Args:
-        yaml_path: Path to builder.yaml file
-
-    Returns:
-        List of DatasetContract instances (one per schema)
-
-    Example builder.yaml structure:
-        output:
-          dataset:
-            domain: instrument-reference
-            subdomain: index-constituents
-          schemas:
-            daily:
-              version: schema_v1
-              required_columns:
-                - name: date
-                  dtype: datetime64[ns]
-                - name: ticker
-                  dtype: object
-            intervals:
-              version: schema_v1
-              required_columns:
-                - name: ticker
-                  dtype: object
-                - name: start_date
-                  dtype: datetime64[ns]
-                - name: end_date
-                  dtype: datetime64[ns]
-          partition_keys:
-            - universe
-            - mode
-    """
-    with open(yaml_path) as f:
-        cfg = yaml.safe_load(f)
-
-    output_cfg = cfg.get("output", {})
-
-    # Load dataset type from output.dataset
-    dataset_cfg = output_cfg.get("dataset", {})
-    validate_dataset_type_config(dataset_cfg)
-    base_dataset_type = dataset_type_from_config(dataset_cfg)
-
-    # Load partition keys (shared)
-    partition_keys = output_cfg.get("partition_keys", [])
-
-    # Load path template (shared, optional)
-    path_template = output_cfg.get("path_template")
-    if not path_template:
-        # Auto-generate default template
-        path_template = (
-            "data/curated/{domain}/{subdomain}/{schema_version}/"
-            + "/".join(f"{key}={{{key}}}" for key in partition_keys)
-        )
-
-    # Load multiple schemas
-    schemas_cfg = output_cfg.get("schemas", {})
-    contracts = []
-
-    for schema_name, schema_cfg in schemas_cfg.items():
-        schema_version = schema_cfg.get("version", "schema_v1")
-
-        required_columns = []
-        for col in schema_cfg.get("required_columns", []):
-            required_columns.append(
-                {
-                    "name": col["name"],
-                    "dtype": col["dtype"],
-                }
-            )
-
-        # Create contract for this schema
-        contract = DatasetContract(
-            dataset_type=base_dataset_type,
-            schema_version=schema_version,
-            required_columns=required_columns,
-            partition_keys=partition_keys,
-            path_template=path_template,
-        )
-        contracts.append(contract)
-
-    return contracts
 
 
 @dataclass
 class ColumnDefinition:
-    """Column definition with filter capabilities."""
+    """Column definition with metadata."""
 
     name: str
     type: str
     description: str = ""
     required: bool = True
     filterable: bool = False
-    filter_type: Optional[str] = None  # range | in | exact | custom
+    filter_type: Optional[str] = None
 
 
 @dataclass
 class FilterDefinition:
-    """Named filter definition for common query patterns."""
+    """Predefined filter for common query patterns."""
 
     name: str
     columns: List[str]
-    type: str  # range | in | exact | custom
+    type: str
     description: str = ""
     example: Optional[Any] = None
 
@@ -215,46 +49,41 @@ class SchemaLoader:
     """
     Loads DatasetContract objects from YAML schema definitions.
 
-    YAML schema format:
-        dataset:
-          domain: market-data | reference-rates | fundamentals | corporate-actions | esg | derived-metrics | portfolio | instrument-reference | metadata | membership | data-products
-          asset_class: equity | bond | commodity | null
-          subdomain: string (e.g., "bars", "benchmark-rates", "esg-scores")
-          subtype: string (optional, custom subtype, not enum-restricted)
+    Unified format for builders and models:
 
-        contract:
-          schema_version: string (e.g., "schema_v1")
+    Builders use output.dataset:
+        output:
+          dataset:
+            domain: market-data
+            subdomain: bars
+            frequency: null
+          schema:
+            schema_version: schema_v1
+            columns: [...]
+          partition_keys: [...]
+          path_template: "..."
 
-          columns:
-            - name: column_name
-              type: date | string | int | float | bool
-              description: human-readable description
-              required: true | false (default: true)
+    Models use output.type:
+        output:
+          type:
+            domain: derived-metrics
+            subdomain: factor-returns
+          schema:
+            schema_version: schema_v1
+            columns: [...]
+          partition_keys: [...]
+          path_template: "..."
 
-          partition_keys:
-            - partition_key_name
-
-          path_template: string with {placeholders}
-
-        parameters:  # Optional: for parameterized contracts
-          param_name:
-            type: enum | string | exchange | frequency
-            values: [list, of, allowed, values]
-            required: true | false
-            default: value
-
-        metadata:  # Optional
-          source: string
-          description: string
-          dependencies: [list, of, builder, names]
-          notes: string
-
-    Example:
-        loader = SchemaLoader()
-        contract = loader.load_contract('path/to/schema.yaml', exchange=Exchange.US, frequency=Frequency.DAILY)
+    Multi-mode builders use output.schemas:
+        output:
+          dataset: {...}
+          schemas:
+            daily: {...}
+            intervals: {...}
+          partition_keys: [...]
     """
 
-    # Type mappings
+    # Domain mapping
     DOMAIN_MAP = {
         "market-data": Domain.MARKET_DATA,
         "reference-rates": Domain.REFERENCE_RATES,
@@ -268,6 +97,7 @@ class SchemaLoader:
         "data-products": Domain.DATA_PRODUCTS,
     }
 
+    # Asset class mapping
     ASSET_CLASS_MAP = {
         "equity": AssetClass.EQUITY,
         "fixed-income": AssetClass.FIXED_INCOME,
@@ -280,6 +110,7 @@ class SchemaLoader:
         None: None,
     }
 
+    # Frequency mapping
     FREQUENCY_MAP = {
         "daily": Frequency.DAILY,
         "weekly": Frequency.WEEKLY,
@@ -290,6 +121,7 @@ class SchemaLoader:
         None: None,
     }
 
+    # Region mapping
     REGION_MAP = {
         "US": Region.US,
         "HK": Region.HK,
@@ -298,18 +130,7 @@ class SchemaLoader:
         None: None,
     }
 
-    EXCHANGE_MAP = {
-        "NYSE": Exchange.NYSE,
-        "NASDAQ": Exchange.NASDAQ,
-        "AMEX": Exchange.AMEX,
-        "HKEX": Exchange.HKEX,
-        "US": Exchange.US,
-        "HK": Exchange.HK,
-        "null": None,
-        None: None,
-    }
-
-    # Build SUBDOMAIN_MAP dynamically from Subdomain enum
+    # Subdomain mapping (dynamic from enum)
     SUBDOMAIN_MAP = {member.value: member for member in Subdomain}
     SUBDOMAIN_MAP["null"] = None
     SUBDOMAIN_MAP[None] = None
@@ -346,36 +167,57 @@ class SchemaLoader:
         self, schema: Dict[str, Any], params: Dict[str, Any]
     ) -> DatasetContract:
         """
-        Build DatasetContract from parsed YAML schema.
+        Build DatasetContract from YAML schema.
 
-        Expects unified builder.yaml format with output.dataset and output.schema sections.
+        Unified format with output.dataset/type + output.schema/schemas.
 
         Args:
-            schema: Parsed YAML schema dictionary
-            params: Parameter values
+            schema: Parsed YAML dictionary
+            params: Runtime parameters (e.g., mode for multi-schema builders)
 
         Returns:
             DatasetContract instance
         """
-        # Validate required parameters
-        if "parameters" in schema:
-            self._validate_parameters(schema["parameters"], params)
+        # Support both "dataset" (builders) and "type" (models)
+        if "dataset" in schema["output"]:
+            dataset_section = schema["output"]["dataset"]
+        elif "type" in schema["output"]:
+            dataset_section = schema["output"]["type"]
+        else:
+            raise ValueError(
+                "output section must have 'dataset' (builders) or 'type' (models)"
+            )
 
-        # Load from unified format: output.dataset + output.schema
-        dataset_section = schema["output"]["dataset"]
-        contract_section = schema["output"]["schema"]
+        # Support both "schema" (single) and "schemas" (multi-mode)
+        if "schema" in schema["output"]:
+            contract_section = schema["output"]["schema"]
+        elif "schemas" in schema["output"]:
+            mode = params.get("mode")
+            if not mode:
+                raise ValueError("'mode' parameter required for multi-schema output")
+            if mode not in schema["output"]["schemas"]:
+                available = list(schema["output"]["schemas"].keys())
+                raise ValueError(f"Unknown mode '{mode}'. Available: {available}")
+            contract_section = schema["output"]["schemas"][mode]
+        else:
+            raise ValueError("output section must have 'schema' or 'schemas'")
 
         # Parse dataset type
         domain = self._parse_domain(dataset_section.get("domain"))
         asset_class = self._parse_asset_class(dataset_section.get("asset_class"))
         subdomain = self._parse_subdomain(dataset_section.get("subdomain"))
-        subtype = dataset_section.get("subtype")  # Custom string, no enum validation
+        subtype = dataset_section.get("subtype")
+        region = self._parse_region(dataset_section.get("region"))
+        frequency = self._parse_frequency(dataset_section.get("frequency"))
 
-        # Handle parameterized region/frequency (for contract-level identity)
-        region = self._parse_region(dataset_section.get("region"), params.get("region"))
-        frequency = self._parse_frequency(
-            dataset_section.get("frequency"), params.get("frequency")
-        )
+        # Override with runtime parameters (for parameterized contracts like tiingo_ohlcv)
+        # Only override if parameter is provided and YAML value is None
+        if "frequency" in params and frequency is None:
+            frequency = params["frequency"]
+        if "region" in params and region is None:
+            region = params["region"]
+        if "asset_class" in params and asset_class is None:
+            asset_class = params["asset_class"]
 
         dataset_type = DatasetType(
             domain=domain,
@@ -386,21 +228,16 @@ class SchemaLoader:
             frequency=frequency,
         )
 
-        # Parse schema section
+        # Parse schema
         schema_version = contract_section.get("schema_version", "schema_v1")
-
-        # Parse columns (extract names and metadata)
         columns = contract_section.get("columns", [])
+
+        # Extract column definitions
         column_defs = []
-        if columns and isinstance(columns[0], dict):
-            # Detailed format: [{name: ..., type: ..., description: ..., filterable: ...}]
-            required_columns = tuple(
-                col["name"]
-                for col in columns
-                if col.get("required", True)  # Default to required
-            )
-            # Parse full column definitions
-            for col in columns:
+        required_columns = []
+
+        for col in columns:
+            if isinstance(col, dict):
                 column_defs.append(
                     ColumnDefinition(
                         name=col["name"],
@@ -411,76 +248,49 @@ class SchemaLoader:
                         filter_type=col.get("filter_type"),
                     )
                 )
-        else:
-            # Simple format: [name1, name2, ...]
-            required_columns = tuple(columns)
-            for col_name in columns:
+                if col.get("required", True):
+                    required_columns.append(col["name"])
+            else:
+                # Simple string format
                 column_defs.append(
-                    ColumnDefinition(name=col_name, type="string", required=True)
+                    ColumnDefinition(name=col, type="string", required=True)
                 )
+                required_columns.append(col)
 
-        # Parse filters section
+        # Parse filters
         filter_defs = {}
         if "filters" in contract_section:
-            for filter_name, filter_spec in contract_section["filters"].items():
-                filter_defs[filter_name] = FilterDefinition(
-                    name=filter_name,
-                    columns=filter_spec.get("columns", []),
-                    type=filter_spec.get("type", "range"),
-                    description=filter_spec.get("description", ""),
-                    example=filter_spec.get("example"),
+            for name, spec in contract_section["filters"].items():
+                filter_defs[name] = FilterDefinition(
+                    name=name,
+                    columns=spec.get("columns", []),
+                    type=spec.get("type", "range"),
+                    description=spec.get("description", ""),
+                    example=spec.get("example"),
                 )
 
-        # Get partition_keys and path_template from output level
+        # Get partition keys and path template
         partition_keys = tuple(schema["output"].get("partition_keys", []))
         path_template = schema["output"].get("path_template", "")
 
-        # Substitute parameters in path_template if needed
-        path_template = self._substitute_template_params(path_template, params)
-
+        # Create contract
         contract = DatasetContract(
             dataset_type=dataset_type,
             schema_version=schema_version,
-            required_columns=required_columns,
+            required_columns=tuple(required_columns),
             partition_keys=partition_keys,
             path_template=path_template,
         )
 
-        # Attach metadata to contract
+        # Attach metadata
         contract.column_definitions = column_defs
         contract.filter_definitions = filter_defs
 
         return contract
 
-    def _validate_parameters(
-        self, param_defs: Dict[str, Any], provided_params: Dict[str, Any]
-    ):
-        """Validate that required parameters are provided."""
-        for param_name, param_def in param_defs.items():
-            if param_def.get("required", False):
-                if param_name not in provided_params:
-                    raise ValueError(
-                        f"Required parameter '{param_name}' not provided. "
-                        f"Expected type: {param_def.get('type')}"
-                    )
-
-            # Validate enum values
-            if param_name in provided_params:
-                param_value = provided_params[param_name]
-                if param_def.get("type") == "enum":
-                    allowed = param_def.get("values", [])
-                    # Handle enum types (Region, Frequency, etc.)
-                    if hasattr(param_value, "value"):
-                        param_value = param_value.value
-                    if param_value not in allowed:
-                        raise ValueError(
-                            f"Invalid value for parameter '{param_name}': {param_value}. "
-                            f"Allowed values: {allowed}"
-                        )
-
     def _parse_domain(self, value: Optional[str]) -> Domain:
         """Parse domain from string."""
-        if value is None:
+        if not value:
             raise ValueError("Domain is required")
         if value not in self.DOMAIN_MAP:
             raise ValueError(f"Invalid domain: {value}")
@@ -488,79 +298,24 @@ class SchemaLoader:
 
     def _parse_asset_class(self, value: Optional[str]) -> Optional[AssetClass]:
         """Parse asset class from string."""
-        if value in self.ASSET_CLASS_MAP:
-            return self.ASSET_CLASS_MAP[value]
-        return None
+        return self.ASSET_CLASS_MAP.get(value)
 
-    def _parse_subdomain(self, value: Optional[str]) -> Optional[Subdomain]:
+    def _parse_subdomain(self, value: Optional[str]) -> Subdomain:
         """Parse subdomain from string."""
-        if value is None:
+        if not value:
             raise ValueError("Subdomain is required")
         if value not in self.SUBDOMAIN_MAP:
-            raise ValueError(
-                f"Invalid subdomain: '{value}'. "
-                f"Valid values: {list(self.SUBDOMAIN_MAP.keys())}"
-            )
+            valid = [k for k in self.SUBDOMAIN_MAP.keys() if k]
+            raise ValueError(f"Invalid subdomain: '{value}'. Valid: {valid[:10]}...")
         return self.SUBDOMAIN_MAP[value]
 
-    def _parse_region(
-        self, schema_value: Optional[str], param_value: Optional[Any]
-    ) -> Optional[Region]:
-        """Parse region from schema or parameter (contract-level)."""
-        # Parameter takes precedence
-        if param_value is not None:
-            if isinstance(param_value, Region):
-                return param_value
-            if param_value in self.REGION_MAP:
-                return self.REGION_MAP[param_value]
+    def _parse_region(self, value: Optional[str]) -> Optional[Region]:
+        """Parse region from string."""
+        return self.REGION_MAP.get(value)
 
-        # Fallback to schema value
-        if schema_value in self.REGION_MAP:
-            return self.REGION_MAP[schema_value]
-
-        return None
-
-    def _parse_exchange(
-        self, schema_value: Optional[str], param_value: Optional[Any]
-    ) -> Optional[Exchange]:
-        """Parse exchange from schema or parameter (partition-level)."""
-        # Parameter takes precedence
-        if param_value is not None:
-            if isinstance(param_value, Exchange):
-                return param_value
-            if param_value in self.EXCHANGE_MAP:
-                return self.EXCHANGE_MAP[param_value]
-
-        # Fallback to schema value
-        if schema_value in self.EXCHANGE_MAP:
-            return self.EXCHANGE_MAP[schema_value]
-
-        return None
-
-    def _parse_frequency(
-        self, schema_value: Optional[str], param_value: Optional[Any]
-    ) -> Optional[Frequency]:
-        """Parse frequency from schema or parameter."""
-        # Parameter takes precedence
-        if param_value is not None:
-            if isinstance(param_value, Frequency):
-                return param_value
-            if param_value in self.FREQUENCY_MAP:
-                return self.FREQUENCY_MAP[param_value]
-
-        # Fallback to schema value
-        if schema_value in self.FREQUENCY_MAP:
-            return self.FREQUENCY_MAP[schema_value]
-
-        return None
-
-    def _substitute_template_params(self, template: str, params: Dict[str, Any]) -> str:
-        """
-        Substitute parameters in path template.
-        Keeps standard placeholders like {schema_version}, {exchange}, etc.
-        """
-        # No substitution needed - path templates use runtime partition values
-        return template
+    def _parse_frequency(self, value: Optional[str]) -> Optional[Frequency]:
+        """Parse frequency from string."""
+        return self.FREQUENCY_MAP.get(value)
 
     def load_schema_metadata(self, schema_path: str | Path) -> Dict[str, Any]:
         """

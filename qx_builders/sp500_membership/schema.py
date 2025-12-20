@@ -8,7 +8,7 @@ Loaded from unified builder.yaml definition.
 from pathlib import Path
 
 from qx.common.contracts import DatasetContract
-from qx.common.schema_loader import load_contracts_from_builder_yaml
+from qx.common.schema_loader import load_contract
 
 # Path to unified YAML file
 BUILDER_YAML_PATH = Path(__file__).parent / "builder.yaml"
@@ -33,4 +33,8 @@ def get_contracts() -> list[DatasetContract]:
         contracts = get_contracts()
         # → [daily_contract, intervals_contract]
     """
-    return load_contracts_from_builder_yaml(BUILDER_YAML_PATH)
+    # Multi-schema builder: load both modes
+    return [
+        load_contract(BUILDER_YAML_PATH, mode="daily"),
+        load_contract(BUILDER_YAML_PATH, mode="intervals"),
+    ]
