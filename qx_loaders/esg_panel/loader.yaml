@@ -10,7 +10,8 @@ inputs:
       domain: esg
       asset_class: equity
       subdomain: esg-scores
-    description: "ESG scores from curated data"
+      frequency: yearly
+    description: "ESG scores from curated data (annual frequency)"
 
 parameters:
   start_date:
@@ -105,7 +106,7 @@ output:
 
   # Validation rules
   validation:
-    allow_empty: false  # Must have data for specified symbols
+    allow_empty: false # Must have data for specified symbols
     required_columns: ["ticker", "esg_year", "year", "esg_score"]
     min_rows: 1
 
@@ -127,4 +128,3 @@ metadata:
     - Uses filter pushdown to load only required symbols
     - Continuity check scans all loaded data for gaps
     - For large symbol lists, consider batching
-

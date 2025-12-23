@@ -1,0 +1,221 @@
+# ============================================================================
+# Market Beta Model - Single Factor Regression (CAPM)
+# ============================================================================
+#
+# Estimates market beta via OLS regression:
+#   Excess_Return_i = α + β * Excess_Return_market + ε
+#
+# Where:
+#   - Excess_Return_i = Return_i - Risk_Free_Rate
+#   - Excess_Return_market = Market_Return - Risk_Free_Rate
+#   - β = Market beta (systematic risk)
+#   - α = Jensen's alpha (risk-adjusted outperformance)
+#
+# Supports:
+#   - Rolling window estimation (e.g., 60-month)
+#   - Full sample estimation (window=null)
+#   - Newey-West HAC standard errors
+#   - Per-symbol beta estimates
+# ============================================================================
+
+model:
+  id: market_beta_model
+  version: 1.0.0
+  description: "Single-factor regression model for market beta estimation (CAPM)"
+
+# ============================================================================
+# INPUTS/OUTPUTS: Dataset types
+# ============================================================================
+inputs:
+  - name: equity_prices
+    required: true
+    description: "Panel of equity OHLCV data"
+    type:
+      domain: market-data
+      asset_class: equity
+      subdomain: bars
+      frequency: null # Runtime parameterized
+
+  - name: market_prices
+    required: true
+    description: "Market proxy OHLCV data (e.g., SPY)"
+    type:
+      domain: market-data
+      asset_class: equity
+      subdomain: bars
+      frequency: null # Runtime parameterized
+
+  - name: risk_free
+    required: true
+    description: "Risk-free rate (e.g., 3-month T-bill)"
+    type:
+      domain: reference-rates
+      asset_class: fixed-income
+      subdomain: yield-curves
+      region: US
+      frequency: null # Runtime parameterized
+
+output:
+  type:
+    domain: derived-metrics
+    asset_class: equity
+    subdomain: factor-exposures
+    subtype: market-beta
+    frequency: null # Runtime parameterized
+
+  # Schema definition
+  schema:
+    schema_version: schema_v1
+
+    columns:
+      - name: symbol
+        type: string
+        description: Ticker symbol
+        required: true
+        filterable: true
+        filter_type: exact
+
+      - name: date
+        type: date
+        description: Estimation date (end of rolling window)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: alpha
+        type: float
+        description: Jensen's alpha (intercept)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: beta
+        type: float
+        description: Market beta (systematic risk)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: alpha_tstat
+        type: float
+        description: Alpha t-statistic (Newey-West)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: beta_tstat
+        type: float
+        description: Beta t-statistic (Newey-West)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: r_squared
+        type: float
+        description: R-squared (goodness of fit)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: residual_vol
+        type: float
+        description: Residual volatility (idiosyncratic risk)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: observations
+        type: int
+        description: Number of observations in regression
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: window_start
+        type: date
+        description: Start date of regression window
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: window_end
+        type: date
+        description: End date of regression window
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: model
+        type: string
+        description: Model identifier
+        required: true
+        filterable: true
+        filter_type: exact
+
+      - name: model_version
+        type: string
+        description: Model version
+        required: true
+        filterable: true
+        filter_type: exact
+
+      - name: run_id
+        type: string
+        description: Unique run identifier
+        required: true
+        filterable: true
+        filter_type: exact
+
+      - name: run_ts
+        type: timestamp
+        description: Run timestamp
+        required: true
+        filterable: true
+        filter_type: range
+
+    partition_keys: []
+
+# ============================================================================
+# PARAMETERS: Model configuration
+# ============================================================================
+parameters:
+  window:
+    type: int
+    required: false
+    default: null
+    description: "Rolling window in months (null = full sample)"
+
+  min_observations:
+    type: int
+    required: false
+    default: 24
+    description: "Minimum observations for valid regression"
+
+  hac_lags:
+    type: int
+    required: false
+    default: 6
+    description: "Newey-West HAC lags for robust standard errors"
+
+  annualization_factor:
+    type: int
+    required: false
+    default: 12
+    description: "Annualization factor (12 for monthly, 252 for daily)"
+
+  price_column:
+    type: str
+    required: false
+    default: "adj_close"
+    description: "Price column to use for returns (adj_close, close)"
+
+# ============================================================================
+# METADATA
+# ============================================================================
+metadata:
+  author: "Qx Framework"
+  created: "2024-12-21"
+  tags: ["capm", "beta", "risk-metrics", "single-factor"]
+  references:
+    - "Sharpe, W. (1964). Capital Asset Prices: A Theory of Market Equilibrium"
+    - "Newey, W., & West, K. (1987). A Simple, Positive Semi-Definite, HAC Covariance Matrix"

@@ -42,7 +42,7 @@ inputs:
       asset_class: equity
       subdomain: esg-scores
       region: null
-      frequency: null
+      frequency: yearly
     description: "Annual ESG scores (esg_year with 'year' column for availability)"
 
   # Input 3: Risk-free rate (curated)
@@ -53,22 +53,8 @@ inputs:
       asset_class: fixed-income
       subdomain: yield-curves
       region: null
-      frequency: null
+      frequency: monthly
     description: "Monthly risk-free rates (specify region and frequency in partitions)"
-
-  # Input 4: Universe filter (optional processed)
-  - name: universe_filter
-    required: false
-    type:
-      domain: derived-metrics
-      asset_class: equity
-      subdomain: models
-      region: null
-      frequency: null
-    description: |
-      Optional universe filter from UniverseFilterModel.
-      If provided, will filter all inputs to tickers that passed_filter=True.
-      Enables automatic filtering to ESG-continuous universe.
 
 output:
   # Dataset identity
@@ -78,7 +64,7 @@ output:
     subdomain: factor-returns
     subtype: esg-factors
     region: null
-    frequency: null
+    frequency: monthly
 
   # Schema definition
   schema:

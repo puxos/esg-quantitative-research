@@ -287,18 +287,26 @@ class DAG:
                 if tid in completed:
                     continue
                 if not t.deps or all(d in completed for d in (t.deps or [])):
-                    # Check if task is a model (has input_requirements metadata)
-                    # Models have both output_types and input_requirements
-                    # Builders only have output_types
-                    if hasattr(t.run, "input_requirements"):
-                        # Model task - auto-inject available_types from dependencies
+                    # Check if task is a model (has is_model=True flag)
+                    if hasattr(t.run, "is_model") and t.run.is_model:
+                        # Model task - auto-inject available_types and context
+                        available_types = self.get_available_types_for_task(tid)
+                        print(
+                            f"[AUTO-INJECT] Task {tid}: {len(available_types)} dataset type(s)"
+                        )
+                        # Pass context for loader outputs
+                        manifest = t.run(
+                            available_types=available_types, ctx=self.context
+                        )
+                    elif hasattr(t.run, "input_requirements"):
+                        # Loader with input requirements - auto-inject available_types
                         available_types = self.get_available_types_for_task(tid)
                         print(
                             f"[AUTO-INJECT] Task {tid}: {len(available_types)} dataset type(s)"
                         )
                         manifest = t.run(available_types=available_types)
                     else:
-                        # Non-model task (builder, loader, etc.)
+                        # Non-model task (builder, simple loader, etc.)
                         try:
                             manifest = t.run(self.context)
                         except TypeError:

@@ -71,18 +71,6 @@ class ESGFactorModel(BaseModel):
         prices_df = inputs["equity_prices"]
         esg_df = inputs["esg_scores"]
         rf_df = inputs["risk_free"]
-        universe_filter_df = inputs.get("universe_filter")
-
-        # Filter to universe if provided
-        if universe_filter_df is not None:
-            filtered_tickers = universe_filter_df[
-                universe_filter_df["passed_filter"] == True
-            ]["ticker"].unique()
-
-            prices_df = prices_df[prices_df["symbol"].isin(filtered_tickers)].copy()
-            esg_df = esg_df[esg_df["ticker"].isin(filtered_tickers)].copy()
-
-            logger.info(f"\n🔍 Filtered to {len(filtered_tickers)} tickers")
 
         # Extract parameters
         quantile = params["quantile"]

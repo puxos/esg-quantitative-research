@@ -20,7 +20,7 @@ from qx.engine.base_model import BaseModel
 logger = logging.getLogger(__name__)
 
 
-class MarketESGRegressionModel(BaseModel):
+class MarketESGBetaModel(BaseModel):
     """
     Market + ESG Two-Factor OLS Regression Model
 
@@ -42,7 +42,7 @@ class MarketESGRegressionModel(BaseModel):
                 - risk_free: Daily risk-free rates
             params: Dict with keys:
                 - esg_factor_name: Which ESG factor to use (default: "ESG")
-                - window_months: Rolling window size (null = full sample)
+                - window_size: Rolling window size (null = full sample)
                 - min_observations: Minimum observations required
                 - use_hac_se: Use Newey-West HAC standard errors
                 - hac_maxlags: Maximum lags for HAC covariance
@@ -78,8 +78,6 @@ class MarketESGRegressionModel(BaseModel):
             # Read from processed storage: data/processed/factor-returns/model=esg_factor_model/run_date=*/
             from pathlib import Path
 
-            import pandas as pd
-
             processed_base = Path("data/processed/factor-returns")
             factor_files = list(
                 processed_base.glob("model=esg_factor_model/run_date=*/*.parquet")
@@ -100,14 +98,14 @@ class MarketESGRegressionModel(BaseModel):
 
         # Extract parameters
         esg_factor_name = params["esg_factor_name"]
-        window_months = params["window_months"]
+        window_size = params["window_size"]
         min_observations = params["min_observations"]
         use_hac_se = params["use_hac_se"]
         hac_maxlags = params["hac_maxlags"]
 
         logger.info(f"Parameters:")
         logger.info(f"  ESG factor: {esg_factor_name}")
-        logger.info(f"  Window: {window_months if window_months else 'Full sample'}")
+        logger.info(f"  Window: {window_size if window_size else 'Full sample'}")
         logger.info(f"  Min observations: {min_observations}")
         logger.info(f"  HAC standard errors: {use_hac_se}")
         if use_hac_se:
@@ -167,7 +165,7 @@ class MarketESGRegressionModel(BaseModel):
                     continue
 
                 # Run regression
-                if window_months is None:
+                if window_size is None:
                     # Full sample (cross-sectional)
                     results = self._run_single_regression(
                         regression_data,
@@ -183,7 +181,7 @@ class MarketESGRegressionModel(BaseModel):
                     results = self._run_rolling_regression(
                         regression_data,
                         symbol,
-                        window_months=window_months,
+                        window_size=window_size,
                         use_hac_se=use_hac_se,
                         hac_maxlags=hac_maxlags,
                     )
@@ -207,7 +205,7 @@ class MarketESGRegressionModel(BaseModel):
         logger.info(f"   Success: {success_count} stocks")
         logger.info(f"   Failed: {fail_count} stocks")
         logger.info(f"   Total results: {len(result_df)} rows")
-        if window_months:
+        if window_size:
             logger.info(
                 f"   Time-series: {result_df['date'].min()} to {result_df['date'].max()}"
             )
@@ -241,7 +239,7 @@ class MarketESGRegressionModel(BaseModel):
         monthly["return"] = monthly.groupby("symbol")["close"].pct_change()
 
         # Resample RF to monthly
-        rf_monthly = MarketESGRegressionModel._resample_rf_to_monthly(rf_df)
+        rf_monthly = MarketESGBetaModel._resample_rf_to_monthly(rf_df)
 
         # Merge and calculate excess returns
         stock_excess = monthly[["date", "symbol", "return"]].dropna()
@@ -267,7 +265,7 @@ class MarketESGRegressionModel(BaseModel):
         market_monthly["market_return"] = market_monthly["close"].pct_change()
 
         # Resample RF to monthly
-        rf_monthly = MarketESGRegressionModel._resample_rf_to_monthly(rf_df)
+        rf_monthly = MarketESGBetaModel._resample_rf_to_monthly(rf_df)
 
         # Calculate excess returns
         market_excess = market_monthly[["date", "market_return"]].dropna()
@@ -361,7 +359,7 @@ class MarketESGRegressionModel(BaseModel):
     def _run_rolling_regression(
         data: pd.DataFrame,
         symbol: str,
-        window_months: int,
+        window_size: int,
         use_hac_se: bool = True,
         hac_maxlags: int = 12,
     ) -> list:
@@ -371,7 +369,7 @@ class MarketESGRegressionModel(BaseModel):
         Args:
             data: DataFrame with excess_return, market_excess, esg_factor
             symbol: Stock ticker
-            window_months: Rolling window size
+            window_size: Rolling window size
             use_hac_se: Use Newey-West HAC standard errors
             hac_maxlags: Maximum lags for HAC covariance
 
@@ -384,10 +382,10 @@ class MarketESGRegressionModel(BaseModel):
         data = data.sort_values("date")
 
         # Rolling windows
-        for i in range(window_months, len(data) + 1):
-            window_data = data.iloc[i - window_months : i]
+        for i in range(window_size, len(data) + 1):
+            window_data = data.iloc[i - window_size : i]
 
-            result = MarketESGRegressionModel._run_single_regression(
+            result = MarketESGBetaModel._run_single_regression(
                 window_data, symbol, use_hac_se=use_hac_se, hac_maxlags=hac_maxlags
             )
 

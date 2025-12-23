@@ -1936,22 +1936,21 @@ results = dag.execute()
 
 **Essential Reading**:
 
-- [ARCHITECTURE_LAYERS_QUICK_REF.md](docs/ARCHITECTURE_LAYERS_QUICK_REF.md) - Framework overview
-- [BUILDER_TYPES_QUICK_REF.md](docs/BUILDER_TYPES_QUICK_REF.md) - SOURCE vs TRANSFORM
-- [LOADER_PATTERN_GUIDE.md](docs/LOADER_PATTERN_GUIDE.md) - Package-based loaders
-- [TEST_ORGANIZATION_QUICK_REF.md](docs/TEST_ORGANIZATION_QUICK_REF.md) - Co-located tests
-- [DAG_ORCHESTRATION_GUIDE.md](docs/DAG_ORCHESTRATION_GUIDE.md) - Task dependencies
-
+- [ARCHITECTURE_LAYERS_QUICK_REF.md](../../docs/ARCHITECTURE_LAYERS_QUICK_REF.md) - Framework overview
+- [BUILDER_TYPES_QUICK_REF.md](../../docs/BUILDER_TYPES_QUICK_REF.md) - SOURCE vs TRANSFORM
+- [LOADER_PATTERN_GUIDE.md](../../docs/LOADER_PATTERN_GUIDE.md) - Package-based loaders
+- [TEST_ORGANIZATION_QUICK_REF.md](../../docs/TEST_ORGANIZATION_QUICK_REF.md) - Co-located tests
+- [DAG_ORCHESTRATION_GUIDE.md](../../docs/DAG_ORCHESTRATION_GUIDE.md) - Task dependencies
 **Design Review**:
 
-- [DESIGN_REVIEW_QUICK_REF.md](docs/DESIGN_REVIEW_QUICK_REF.md) - All 6 recommendations
-- [STANDARDIZED_INITIALIZATION_QUICK_REF.md](docs/STANDARDIZED_INITIALIZATION_QUICK_REF.md) - High-level abstractions
-- [ENUM_VALIDATION_QUICK_REF.md](docs/ENUM_VALIDATION_QUICK_REF.md) - Type safety
+- [DESIGN_REVIEW_QUICK_REF.md](../../docs/DESIGN_REVIEW_QUICK_REF.md) - All 6 recommendations
+- [STANDARDIZED_INITIALIZATION_QUICK_REF.md](../../docs/STANDARDIZED_INITIALIZATION_QUICK_REF.md) - High-level abstractions
+- [ENUM_VALIDATION_QUICK_REF.md](../../docs/ENUM_VALIDATION_QUICK_REF.md) - Type safety
 
 **Working Examples**:
 
-- [examples/builder_dag_with_loader.py](examples/builder_dag_with_loader.py) - Complete DAG
-- [examples/standalone_builder.py](examples/standalone_builder.py) - Builder execution
+- [examples/builder_dag_with_loader.py](../../examples/builder_dag_with_loader.py) - Complete DAG
+- [examples/standalone_builder.py](../../examples/standalone_builder.py) - Builder execution
 
 ---
 
@@ -1970,7 +1969,7 @@ Qx is a **local-first, swappable architecture** for financial data pipelines:
 
 **Start Here**:
 
-1. Read [ARCHITECTURE_LAYERS_QUICK_REF.md](docs/ARCHITECTURE_LAYERS_QUICK_REF.md)
-2. Explore working builders: [qx_builders/sp500_membership/](qx_builders/sp500_membership/)
+1. Read [ARCHITECTURE_LAYERS_QUICK_REF.md](../../docs/ARCHITECTURE_LAYERS_QUICK_REF.md)
+2. Explore working builders: [qx_builders/sp500_membership/](../../qx_builders/sp500_membership/)
 3. Run validation: `python -m qx.tools.validate_builder_yaml`
-4. Build your first DAG: [examples/builder_dag_with_loader.py](examples/builder_dag_with_loader.py)
+4. Build your first DAG: [examples/builder_dag_with_loader.py](../../examples/builder_dag_with_loader.py)

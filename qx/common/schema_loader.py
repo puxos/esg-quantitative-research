@@ -270,8 +270,16 @@ class SchemaLoader:
                 )
 
         # Get partition keys and path template
-        partition_keys = tuple(schema["output"].get("partition_keys", []))
-        path_template = schema["output"].get("path_template", "")
+        # Builders: At top-level output
+        # Models: Inside contract section (schema)
+        # Try contract section first (models), fall back to top-level (builders)
+        partition_keys = tuple(
+            contract_section.get("partition_keys")
+            or schema["output"].get("partition_keys", [])
+        )
+        path_template = contract_section.get("path_template") or schema["output"].get(
+            "path_template", ""
+        )
 
         # Create contract
         contract = DatasetContract(

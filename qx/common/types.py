@@ -180,15 +180,21 @@ def to_enum(enum_class: type[Enum], value: any) -> Optional[Enum]:
     raise ValueError(f"Unknown {enum_class.__name__}: {value}")
 
 
-def dataset_type_from_config(config: dict) -> DatasetType:
+def dataset_type_from_config(config: dict, runtime_params: dict = None) -> DatasetType:
     """
-    Create DatasetType from YAML configuration dictionary.
+    Create DatasetType from YAML configuration dictionary with runtime parameter support.
 
     Shared utility for creating DatasetType instances from builder.yaml, model.yaml, etc.
     Performs enum conversion and validation.
 
+    Supports runtime parameterization: YAML can specify null values for
+    frequency, region, or asset_class, which are then provided at runtime.
+
     Args:
         config: Configuration dict with domain, asset_class, subdomain, etc.
+        runtime_params: Runtime parameters to override null YAML values
+                       (e.g., {"frequency": "daily", "region": "US"})
+                       Values can be enum instances or strings.
 
     Returns:
         DatasetType instance
@@ -196,20 +202,51 @@ def dataset_type_from_config(config: dict) -> DatasetType:
     Raises:
         ValueError: If domain is missing or enum values are invalid
 
-    Example:
+    Examples:
         >>> config = {"domain": "market-data", "subdomain": "bars", "frequency": "daily"}
         >>> dataset_type_from_config(config)
         DatasetType(domain=<Domain.MARKET_DATA: 'market-data'>, ...)
+
+        >>> # Runtime parameterization
+        >>> config = {"domain": "market-data", "subdomain": "bars", "frequency": null}
+        >>> dataset_type_from_config(config, {"frequency": "daily"})
+        DatasetType(domain=<Domain.MARKET_DATA: 'market-data'>, frequency=<Frequency.DAILY>)
     """
+    runtime_params = runtime_params or {}
+
     domain = to_enum(Domain, config.get("domain"))
     if domain is None:
         raise ValueError("Domain is required in dataset type configuration")
 
+    # Parse base values from YAML
+    frequency_yaml = to_enum(Frequency, config.get("frequency"))
+    region_yaml = to_enum(Region, config.get("region"))
+    asset_class_yaml = to_enum(AssetClass, config.get("asset_class"))
+
+    # Apply runtime overrides for null values
+    # Convert runtime param values to enums if they're strings
+    frequency = frequency_yaml
+    if frequency is None and "frequency" in runtime_params:
+        freq_val = runtime_params["frequency"]
+        frequency = (
+            to_enum(Frequency, freq_val) if isinstance(freq_val, str) else freq_val
+        )
+
+    region = region_yaml
+    if region is None and "region" in runtime_params:
+        reg_val = runtime_params["region"]
+        region = to_enum(Region, reg_val) if isinstance(reg_val, str) else reg_val
+
+    asset_class = asset_class_yaml
+    if asset_class is None and "asset_class" in runtime_params:
+        ac_val = runtime_params["asset_class"]
+        asset_class = to_enum(AssetClass, ac_val) if isinstance(ac_val, str) else ac_val
+
     return DatasetType(
         domain=domain,
-        asset_class=to_enum(AssetClass, config.get("asset_class")),
+        asset_class=asset_class,
         subdomain=to_enum(Subdomain, config.get("subdomain")),
         subtype=config.get("subtype"),  # Custom string, no enum conversion
-        region=to_enum(Region, config.get("region")),
-        frequency=to_enum(Frequency, config.get("frequency")),
+        region=region,
+        frequency=frequency,
     )

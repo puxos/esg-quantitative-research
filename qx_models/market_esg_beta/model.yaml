@@ -1,5 +1,5 @@
 model:
-  id: market_esg_regression_model
+  id: market_esg_beta_model
   version: 1.0.0
   featureset_id: ohlcv_v1+esg_factors_v1+rf_v1
   description: |
@@ -32,6 +32,7 @@ inputs:
       domain: market-data
       asset_class: equity
       subdomain: bars
+      region: null
       frequency: monthly
     description: "Monthly stock OHLCV data for calculating returns"
 
@@ -42,6 +43,7 @@ inputs:
       domain: market-data
       asset_class: equity
       subdomain: bars
+      region: null
       frequency: monthly
     description: "Monthly SPY bar data (market proxy)"
 
@@ -53,7 +55,8 @@ inputs:
     type:
       domain: derived-metrics
       asset_class: equity
-      subdomain: factors
+      subdomain: factor-returns
+      subtype: esg-factors
       region: null
       frequency: monthly
     description: "Monthly ESG factor returns (output from ESGFactorModel in processed storage)"
@@ -294,7 +297,7 @@ parameters:
       - E/S/G: Individual pillar factors
       - ESG_mom: ESG momentum factor
 
-  window_months:
+  window_size:
     type: int
     default: null
     min: 36

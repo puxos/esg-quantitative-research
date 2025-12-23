@@ -69,21 +69,13 @@ class SP500MembershipBuilder(DataBuilderBase):
 
         contracts = get_contracts()
 
-        # Select contract based on schema columns (daily has 'date', intervals has 'start_date')
+        # Select contract based on mode (first is daily, second is intervals)
         if mode == "intervals":
-            # Intervals contract has 'start_date' and 'end_date' columns
-            self.contract = next(
-                c
-                for c in contracts
-                if any(col["name"] == "start_date" for col in c.required_columns)
-            )
+            # Intervals contract is the second one
+            self.contract = contracts[1]
         else:  # daily mode
-            # Daily contract has 'date' column
-            self.contract = next(
-                c
-                for c in contracts
-                if any(col["name"] == "date" for col in c.required_columns)
-            )
+            # Daily contract is the first one
+            self.contract = contracts[0]
 
         # Now call parent's build() which will use our selected contract
         return super().build(partitions=partitions, **kwargs)

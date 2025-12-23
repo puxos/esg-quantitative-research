@@ -209,13 +209,22 @@ def run_loader(
     # the loader verifies as existing (by successfully reading them)
     verified_types = []
 
+    # Extract runtime type parameters from overrides
+    # These override null values in YAML (e.g., frequency: null → frequency: daily)
+    runtime_params = {
+        k: v
+        for k, v in (overrides or {}).items()
+        if k in ("frequency", "region", "asset_class")
+    }
+
     # Extract inputs from top-level
     inputs_list = loader_config.get("inputs", [])
 
     for inp in inputs_list:
         # Loader YAML uses "type" key, not "dataset_type"
         if "type" in inp:
-            dataset_type = dataset_type_from_config(inp["type"])
+            # Pass runtime params to properly resolve parameterized types
+            dataset_type = dataset_type_from_config(inp["type"], runtime_params)
             verified_types.append(dataset_type)
 
     # Attach verified types so DAG can collect them for models
@@ -479,12 +488,13 @@ def run_model(
         for inp in model_config.get("inputs", [])
     ]
 
-    def task_callable(available_types: List[DatasetType]) -> Dict:
+    def task_callable(available_types: List[DatasetType], ctx: Dict = None) -> Dict:
         """
-        Execute model with auto-injected dataset types.
+        Execute model with auto-injected dataset types and optional loader outputs.
 
         Args:
             available_types: Dataset types injected by DAG from dependencies
+            ctx: DAG context containing outputs from dependency tasks (loader outputs)
         """
         # Dynamic import of model module
         module_name = f"model_mod_{pkg_dir.name}"
@@ -521,10 +531,56 @@ def run_model(
             overrides=overrides or {},
         )
 
-        # Execute model with auto-injected types
+        # Extract pre-loaded inputs from loader outputs in context (if available)
+        inputs_df = None
+        if ctx is not None:
+            # Map input names to loader outputs from dependencies
+            # Model YAML declares inputs with names (e.g., "equity_prices", "market_prices", "risk_free")
+            # Match these to task outputs in context
+            inputs_df = {}
+
+            # Define mapping patterns: model input name -> potential task ID patterns
+            # This can be overridden via a mapping parameter in the future
+            input_mappings = {
+                "equity_prices": ["LoadOHLCVPanel", "LoadEquityPrices", "LoadPrices"],
+                "market_prices": ["LoadMarketProxy", "LoadMarketPrices", "LoadMarket"],
+                "risk_free": ["LoadTreasuryRates", "LoadRiskFree", "LoadTreasury"],
+            }
+
+            for inp in model.inputs_cfg:
+                input_name = inp["name"]
+                potential_tasks = input_mappings.get(input_name, [])
+
+                # Try to find matching loader output in context
+                for task_id in potential_tasks:
+                    if task_id in ctx and isinstance(ctx[task_id], dict):
+                        task_result = ctx[task_id]
+                        if "output" in task_result:
+                            inputs_df[input_name] = task_result["output"]
+                            print(
+                                f"  ✓ Mapped {task_id} → {input_name} ({len(task_result['output'])} rows)"
+                            )
+                            break
+
+            # Only use inputs_df if we found all required inputs
+            required_inputs = [
+                i["name"] for i in model.inputs_cfg if i.get("required", True)
+            ]
+            if len(inputs_df) < len(required_inputs):
+                missing = set(required_inputs) - set(inputs_df.keys())
+                print(f"  ⚠ Missing required inputs: {missing}")
+                print(f"  ⚠ Falling back to loading from curated storage")
+                inputs_df = None  # Fall back to loading from storage
+            else:
+                print(
+                    f"  ✅ All {len(inputs_df)} required inputs mapped from loader outputs"
+                )
+
+        # Execute model with auto-injected types and optional pre-loaded inputs
         output_df = model.run(
             available_types=available_types,
             partitions_by_input=partitions or {},
+            inputs_df=inputs_df,
             run_id=run_id,
         )
 
@@ -539,6 +595,7 @@ def run_model(
     # Attach metadata for DAG validation and auto-injection
     task_callable.output_types = [output_type]
     task_callable.input_requirements = input_requirements
+    task_callable.is_model = True  # Mark as model task for DAG
     task_callable._model_package_path = package_path  # For error messages
 
     return task_callable

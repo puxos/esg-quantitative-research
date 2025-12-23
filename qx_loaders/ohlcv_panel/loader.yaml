@@ -10,6 +10,7 @@ inputs:
       domain: market-data
       asset_class: equity
       subdomain: bars
+      frequency: null # Runtime parameterized - pass via overrides
     description: "OHLCV price data from curated data"
 
 parameters:

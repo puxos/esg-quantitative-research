@@ -141,13 +141,22 @@ class BaseModel(abc.ABC):
         self,
         available_types: List[DatasetType],
         partitions_by_input: Dict[str, Dict[str, str]],
+        inputs_df: Optional[Dict[str, pd.DataFrame]] = None,
         **kwargs,
     ) -> pd.DataFrame:
-        contracts_by_name = self._resolve_inputs(available_types, partitions_by_input)
-        inputs_df = {
-            name: self.loader.load(c.dataset_type, partitions_by_input.get(name, {}))
-            for name, c in contracts_by_name.items()
-        }
+        # Use pre-loaded inputs if provided (from loader outputs), otherwise load from storage
+        if inputs_df is None:
+            contracts_by_name = self._resolve_inputs(
+                available_types, partitions_by_input
+            )
+            inputs_df = {
+                name: self.loader.load(
+                    c.dataset_type, partitions_by_input.get(name, {})
+                )
+                for name, c in contracts_by_name.items()
+            }
+        else:
+            print("✅ Using pre-loaded inputs from loader outputs (no re-loading)")
         outputs = self.run_impl(inputs_df, params=self.params, **kwargs).assign(
             model=self.info["id"],
             model_version=self.info["version"],
