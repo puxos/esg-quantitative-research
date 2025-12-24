@@ -175,6 +175,8 @@ output:
 
     partition_keys: []
 
+    path_template: data/processed/{output_type}/model={model}/run_date={run_date}
+
 # ============================================================================
 # PARAMETERS: Model configuration
 # ============================================================================

@@ -68,7 +68,8 @@ class MarkowitzPortfolioModel(BaseModel):
 
         # Extract inputs
         expected_returns_df = inputs["expected_returns"]
-        two_factor_betas_df = inputs["two_factor_betas"]
+        two_factor_betas_df = inputs.get("two_factor_betas")
+        market_betas_df = inputs.get("market_betas")
         equity_prices = inputs["equity_prices"]
         risk_free = inputs["risk_free"]
         sector_mapping_df = inputs.get("sector_mapping")
@@ -87,76 +88,148 @@ class MarkowitzPortfolioModel(BaseModel):
         turnover_penalty = params.get("turnover_penalty", 0.0)
         compute_frontier = params.get("compute_frontier", False)
 
-        # Get optimization date from kwargs
+        # Get optimization dates (all unique dates or specific date)
         optimization_date = kwargs.get("optimization_date")
         if optimization_date is None:
-            optimization_date = expected_returns_df["date"].max()
+            # Optimize for all available dates (monthly time series)
+            all_dates = sorted(expected_returns_df["date"].unique())
 
-        logger.info(f"Optimization date: {optimization_date}")
+            # Filter dates to ensure sufficient lookback for covariance estimation
+            # Need at least lookback_months of data before optimization date
+            min_date = equity_prices["date"].min()
+            min_optimization_date = min_date + pd.DateOffset(months=lookback_months)
+
+            optimization_dates = [d for d in all_dates if d >= min_optimization_date]
+
+            logger.info(
+                f"Filtered {len(all_dates)} dates to {len(optimization_dates)} dates with sufficient lookback"
+            )
+            logger.info(
+                f"First optimization date: {optimization_dates[0] if optimization_dates else 'N/A'}"
+            )
+            logger.info(
+                f"Last optimization date: {optimization_dates[-1] if optimization_dates else 'N/A'}"
+            )
+        else:
+            # Single date optimization
+            optimization_dates = [optimization_date]
+            logger.info(f"Optimizing for single date: {optimization_date}")
+
         logger.info(
             f"Parameters: gamma={gamma}, position_max={position_max}, "
             f"esg_neutral={esg_neutral}"
         )
 
-        # 1. Prepare expected returns
-        logger.info("Step 1: Preparing expected returns")
-        exp_ret_series = self._prepare_expected_returns(
-            expected_returns_df, optimization_date
-        )
+        # Loop through each optimization date
+        all_results = []
 
-        # 2. Prepare ESG betas
-        logger.info("Step 2: Preparing ESG betas")
-        esg_beta_series = self._prepare_esg_betas(
-            two_factor_betas_df, exp_ret_series.index.tolist()
-        )
+        for opt_date in optimization_dates:
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Optimization date: {opt_date}")
+            logger.info(f"{'='*60}")
 
-        # 3. Build covariance matrix
-        logger.info("Step 3: Building covariance matrix")
-        cov_matrix = self._build_covariance_matrix(
-            equity_prices=equity_prices,
-            risk_free=risk_free,
-            tickers=exp_ret_series.index.tolist(),
-            lookback_months=lookback_months,
-            shrinkage_intensity=shrinkage_intensity,
-            optimization_date=optimization_date,
-        )
-
-        # 4. Prepare sector mapping (if applicable)
-        sector_map = None
-        sector_caps_dict = None
-        if sector_constraints and sector_mapping_df is not None:
-            logger.info("Step 4: Preparing sector constraints")
-            sector_map = self._prepare_sector_mapping(
-                sector_mapping_df, exp_ret_series.index.tolist()
-            )
-            # Apply sector cap to all sectors
-            sector_caps_dict = {
-                sector: sector_cap for sector in sector_map.unique() if pd.notna(sector)
-            }
-            logger.info(
-                f"  Applying sector cap of {sector_cap:.1%} to {len(sector_caps_dict)} sectors"
+            # 1. Prepare expected returns for this date
+            logger.info("Step 1: Preparing expected returns")
+            exp_ret_series = self._prepare_expected_returns(
+                expected_returns_df, opt_date
             )
 
-        # 5. Determine ESG bounds
-        esg_bounds = self._determine_esg_bounds(
-            esg_neutral, esg_lower_bound, esg_upper_bound
-        )
+            # 2. Prepare ESG betas (or use market betas as fallback)
+            logger.info("Step 2: Preparing factor betas")
+            if two_factor_betas_df is not None:
+                esg_beta_series = self._prepare_esg_betas(
+                    two_factor_betas_df, exp_ret_series.index.tolist()
+                )
+                logger.info("  Using ESG betas from two_factor model")
+            elif market_betas_df is not None:
+                # Use market betas as fallback (neutral ESG exposure = 1.0 for all)
+                esg_beta_series = self._prepare_market_betas_as_esg(
+                    market_betas_df, exp_ret_series.index.tolist()
+                )
+                logger.info("  Using market betas as ESG proxy (neutral = 1.0)")
+            else:
+                # No betas available - use neutral (1.0) for all stocks
+                esg_beta_series = pd.Series(1.0, index=exp_ret_series.index)
+                logger.info("  No betas available - using neutral (1.0) for all stocks")
 
-        # 6. Get current risk-free rate (for Sharpe calculation)
-        rf_monthly = self._get_current_rf_monthly(risk_free, optimization_date)
+            # 3. Build covariance matrix
+            logger.info("Step 3: Building covariance matrix")
+            cov_matrix = self._build_covariance_matrix(
+                equity_prices=equity_prices,
+                risk_free=risk_free,
+                tickers=exp_ret_series.index.tolist(),
+                lookback_months=lookback_months,
+                shrinkage_intensity=shrinkage_intensity,
+                optimization_date=opt_date,
+            )
 
-        # 7. Optimize portfolio
-        if compute_frontier:
-            logger.info("Step 7: Computing efficient frontier")
-            gammas = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0]
-            results_list = []
+            # 4. Prepare sector mapping (if applicable)
+            sector_map = None
+            sector_caps_dict = None
+            if sector_constraints and sector_mapping_df is not None:
+                logger.info("Step 4: Preparing sector constraints")
+                sector_map = self._prepare_sector_mapping(
+                    sector_mapping_df, exp_ret_series.index.tolist()
+                )
+                # Apply sector cap to all sectors
+                sector_caps_dict = {
+                    sector: sector_cap
+                    for sector in sector_map.unique()
+                    if pd.notna(sector)
+                }
+                logger.info(
+                    f"  Applying sector cap of {sector_cap:.1%} to {len(sector_caps_dict)} sectors"
+                )
 
-            for g in gammas:
+            # 5. Determine ESG bounds
+            esg_bounds = self._determine_esg_bounds(
+                esg_neutral, esg_lower_bound, esg_upper_bound
+            )
+
+            # 6. Get current risk-free rate (for Sharpe calculation)
+            rf_monthly = self._get_current_rf_monthly(risk_free, opt_date)
+
+            # 7. Optimize portfolio
+            if compute_frontier:
+                logger.info("Step 7: Computing efficient frontier")
+                gammas = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0]
+
+                for g in gammas:
+                    weights = self._optimize_portfolio(
+                        exp_ret=exp_ret_series,
+                        cov_matrix=cov_matrix,
+                        esg_beta=esg_beta_series,
+                        gamma=g,
+                        long_only=long_only,
+                        position_max=position_max,
+                        esg_bounds=esg_bounds,
+                        sector_map=sector_map,
+                        sector_caps=sector_caps_dict,
+                    )
+
+                    result_df = self._format_output(
+                        weights=weights,
+                        exp_ret=exp_ret_series,
+                        cov_matrix=cov_matrix,
+                        esg_beta=esg_beta_series,
+                        sector_map=sector_map,
+                        optimization_date=opt_date,
+                        gamma=g,
+                        esg_bounds=esg_bounds,
+                        rf_monthly=rf_monthly,
+                    )
+                    all_results.append(result_df)
+
+                logger.info(
+                    f"Generated {len(gammas)} frontier portfolios for {opt_date}"
+                )
+            else:
+                logger.info(f"Step 7: Optimizing portfolio (gamma={gamma})")
                 weights = self._optimize_portfolio(
                     exp_ret=exp_ret_series,
                     cov_matrix=cov_matrix,
                     esg_beta=esg_beta_series,
-                    gamma=g,
+                    gamma=gamma,
                     long_only=long_only,
                     position_max=position_max,
                     esg_bounds=esg_bounds,
@@ -170,44 +243,24 @@ class MarkowitzPortfolioModel(BaseModel):
                     cov_matrix=cov_matrix,
                     esg_beta=esg_beta_series,
                     sector_map=sector_map,
-                    optimization_date=optimization_date,
-                    gamma=g,
+                    optimization_date=opt_date,
+                    gamma=gamma,
                     esg_bounds=esg_bounds,
                     rf_monthly=rf_monthly,
                 )
-                results_list.append(result_df)
+                all_results.append(result_df)
 
-            result_df = pd.concat(results_list, ignore_index=True)
-            logger.info(f"Generated {len(gammas)} frontier portfolios")
+        # Concatenate all results
+        if len(all_results) > 1:
+            final_result = pd.concat(all_results, ignore_index=True)
+            logger.info(
+                f"\n✅ Optimization complete: {len(all_results)} time periods, {len(final_result)} total positions"
+            )
         else:
-            logger.info(f"Step 7: Optimizing portfolio (gamma={gamma})")
-            weights = self._optimize_portfolio(
-                exp_ret=exp_ret_series,
-                cov_matrix=cov_matrix,
-                esg_beta=esg_beta_series,
-                gamma=gamma,
-                long_only=long_only,
-                position_max=position_max,
-                esg_bounds=esg_bounds,
-                sector_map=sector_map,
-                sector_caps=sector_caps_dict,
-            )
+            final_result = all_results[0]
+            logger.info(f"\n✅ Optimization complete: {len(final_result)} positions")
 
-            result_df = self._format_output(
-                weights=weights,
-                exp_ret=exp_ret_series,
-                cov_matrix=cov_matrix,
-                esg_beta=esg_beta_series,
-                sector_map=sector_map,
-                optimization_date=optimization_date,
-                gamma=gamma,
-                esg_bounds=esg_bounds,
-                rf_monthly=rf_monthly,
-            )
-
-        logger.info(f"Portfolio optimization completed: {len(result_df)} positions")
-
-        return result_df
+        return final_result
 
     def _prepare_expected_returns(
         self,
@@ -287,6 +340,44 @@ class MarkowitzPortfolioModel(BaseModel):
 
         return esg_beta
 
+    def _prepare_market_betas_as_esg(
+        self,
+        market_betas_df: pd.DataFrame,
+        tickers: list,
+    ) -> pd.Series:
+        """
+        Prepare market betas as ESG proxy (fallback when no ESG betas available).
+
+        Args:
+            market_betas_df: Market betas from market_beta model
+            tickers: List of tickers to include
+
+        Returns:
+            Series with symbol → neutral ESG beta (1.0)
+        """
+        df = market_betas_df.copy()
+
+        # Rename columns to standard format
+        if "ticker" in df.columns and "symbol" not in df.columns:
+            df = df.rename(columns={"ticker": "symbol"})
+
+        # Use latest beta estimate for each stock
+        df = df.sort_values(["symbol", "date"])
+        df = df.groupby("symbol").tail(1)
+
+        # Create neutral ESG betas (1.0) since we don't have actual ESG data
+        # This makes portfolio ESG-neutral by default
+        esg_beta = pd.Series(1.0, index=tickers)
+
+        logger.info(
+            f"Using market betas as fallback (neutral ESG = 1.0) for {len(esg_beta)} stocks"
+        )
+        logger.info(f"  All ESG betas set to 1.0 (neutral)")
+
+        return esg_beta
+
+        return esg_beta
+
     def _build_covariance_matrix(
         self,
         equity_prices: pd.DataFrame,
@@ -333,7 +424,7 @@ class MarkowitzPortfolioModel(BaseModel):
 
             # Resample to monthly
             ticker_prices = ticker_prices.set_index("date")
-            monthly = ticker_prices["adjClose"].resample("ME").last()
+            monthly = ticker_prices["adj_close"].resample("ME").last()
             returns = monthly.pct_change().dropna()
 
             if len(returns) > 0:
@@ -569,7 +660,20 @@ class MarkowitzPortfolioModel(BaseModel):
         prob.solve(solver=cp.ECOS, verbose=False)
 
         if w.value is None:
-            raise RuntimeError("Optimization failed with CVXPY")
+            logger.error(f"  ❌ Optimization failed!")
+            logger.error(f"  Problem status: {prob.status}")
+            logger.error(f"  Num assets: {len(tickers)}")
+            logger.error(f"  Expected returns shape: {mu.shape}")
+            logger.error(f"  Covariance matrix shape: {Sigma.shape}")
+            logger.error(
+                f"  Covariance matrix condition number: {np.linalg.cond(Sigma):.2e}"
+            )
+            logger.error(f"  Risk aversion (gamma): {gamma}")
+            logger.error(f"  Long only: {long_only}")
+            logger.error(f"  Position max: {position_max}")
+            logger.error(f"  ESG bounds: {esg_bounds}")
+            logger.error(f"  ESG beta: {beta_esg}")
+            raise RuntimeError(f"Optimization failed: {prob.status}")
 
         weights = pd.Series(np.array(w.value).ravel(), index=tickers)
 

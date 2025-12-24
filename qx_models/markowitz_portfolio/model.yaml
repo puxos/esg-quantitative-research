@@ -39,7 +39,7 @@ inputs:
       domain: derived-metrics
       asset_class: equity
       subdomain: expected-returns
-      subtype: null
+      subtype: capm # Accept CAPM output
       region: null
       frequency: monthly
     description: |
@@ -50,7 +50,7 @@ inputs:
 
   # Two-factor betas (for ESG exposure constraint)
   - name: two_factor_betas
-    required: true
+    required: false
     type:
       domain: derived-metrics
       asset_class: equity
@@ -64,16 +64,34 @@ inputs:
 
       Must contain: symbol, beta_esg
 
+      If not provided, will use market betas from market_beta model instead.
+
+  # Market betas (fallback if two_factor_betas not available)
+  - name: market_betas
+    required: false
+    type:
+      domain: derived-metrics
+      asset_class: equity
+      subdomain: factor-exposures
+      subtype: market-beta
+      region: null
+      frequency: null
+    description: |
+      Market betas from market_beta model (fallback).
+      Used if two_factor_betas not provided.
+
+      Must contain: symbol, beta
+
   # Historical prices (for covariance estimation)
   - name: equity_prices
     required: true
     type:
       domain: market-data
       asset_class: equity
-      subdomain: ohlcv
+      subdomain: bars
       subtype: null
-      region: US
-      frequency: daily
+      region: null # Accept any region
+      frequency: null # Accept any frequency (will be resampled if needed)
     description: |
       Historical equity prices for covariance estimation.
       Resampled to monthly frequency and used to build Σ matrix.
@@ -99,7 +117,7 @@ inputs:
     type:
       domain: metadata
       asset_class: equity
-      subdomain: sectors
+      subdomain: null
       region: null
       frequency: null
     description: |
@@ -361,7 +379,7 @@ parameters:
 
   position_max:
     type: float
-    default: 0.10
+    default: 0.40 # Allow concentration for small universes (3-5 stocks)
     min: 0.01
     max: 1.0
     description: |
@@ -369,8 +387,9 @@ parameters:
 
       Prevents excessive concentration:
         - 0.05 (5%): Highly diversified (20+ holdings)
-        - 0.10 (10%): Balanced diversification (default)
+        - 0.10 (10%): Balanced diversification (default for large universes)
         - 0.20 (20%): Concentrated (5-10 holdings)
+        - 0.40 (40%): Small universe (3-5 stocks)
 
       Regulatory limits:
         - UCITS: 10% per position

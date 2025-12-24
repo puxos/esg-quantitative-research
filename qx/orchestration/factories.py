@@ -416,6 +416,7 @@ def run_model(
     partitions: Optional[Dict[str, Dict[str, str]]] = None,
     run_id: Optional[str] = None,
     overrides: Optional[Dict] = None,
+    input_mappings: Optional[Dict[str, List[str]]] = None,
 ) -> Callable[[], Dict]:
     """
     Create a DAG task callable for a model package.
@@ -434,6 +435,10 @@ def run_model(
         partitions: Partition filters by input name (e.g., {"risk_free": {"region": "US"}})
         run_id: Run identifier for output tracking
         overrides: Parameter overrides (e.g., {"horizon_d": 252})
+        input_mappings: Optional dict mapping input names to task IDs for auto-injection
+                       e.g., {"equity_prices": ["LoadOHLCVPanel", "LoadPrices"],
+                              "expected_returns": ["BuildCAPM"]}
+                       If None, auto-mapping is disabled and inputs loaded from storage.
 
     Returns:
         Callable that executes model and returns task manifest dict
@@ -531,27 +536,19 @@ def run_model(
             overrides=overrides or {},
         )
 
-        # Extract pre-loaded inputs from loader outputs in context (if available)
+        # Extract pre-loaded inputs from loader/model outputs in context (if available)
         inputs_df = None
-        if ctx is not None:
-            # Map input names to loader outputs from dependencies
-            # Model YAML declares inputs with names (e.g., "equity_prices", "market_prices", "risk_free")
+        if ctx is not None and input_mappings is not None:
+            # Map input names to loader/model outputs from dependencies
+            # Model YAML declares inputs with names (e.g., "equity_prices", "expected_returns", "market_betas")
             # Match these to task outputs in context
             inputs_df = {}
-
-            # Define mapping patterns: model input name -> potential task ID patterns
-            # This can be overridden via a mapping parameter in the future
-            input_mappings = {
-                "equity_prices": ["LoadOHLCVPanel", "LoadEquityPrices", "LoadPrices"],
-                "market_prices": ["LoadMarketProxy", "LoadMarketPrices", "LoadMarket"],
-                "risk_free": ["LoadTreasuryRates", "LoadRiskFree", "LoadTreasury"],
-            }
 
             for inp in model.inputs_cfg:
                 input_name = inp["name"]
                 potential_tasks = input_mappings.get(input_name, [])
 
-                # Try to find matching loader output in context
+                # Try to find matching loader/model output in context
                 for task_id in potential_tasks:
                     if task_id in ctx and isinstance(ctx[task_id], dict):
                         task_result = ctx[task_id]
@@ -562,19 +559,23 @@ def run_model(
                             )
                             break
 
-            # Only use inputs_df if we found all required inputs
-            required_inputs = [
-                i["name"] for i in model.inputs_cfg if i.get("required", True)
-            ]
-            if len(inputs_df) < len(required_inputs):
-                missing = set(required_inputs) - set(inputs_df.keys())
-                print(f"  ⚠ Missing required inputs: {missing}")
-                print(f"  ⚠ Falling back to loading from curated storage")
-                inputs_df = None  # Fall back to loading from storage
+            if inputs_df:
+                # Only use inputs_df if we found all required inputs
+                required_inputs = [
+                    i["name"] for i in model.inputs_cfg if i.get("required", True)
+                ]
+                if len(inputs_df) < len(required_inputs):
+                    missing = set(required_inputs) - set(inputs_df.keys())
+                    print(f"  ⚠ Missing required inputs: {missing}")
+                    print(f"  ⚠ Falling back to loading from curated storage")
+                    inputs_df = None  # Fall back to loading from storage
+                else:
+                    print(
+                        f"  ✅ All {len(inputs_df)} required inputs mapped from loader/model outputs"
+                    )
             else:
-                print(
-                    f"  ✅ All {len(inputs_df)} required inputs mapped from loader outputs"
-                )
+                # No mappings found, fall back to storage
+                inputs_df = None
 
         # Execute model with auto-injected types and optional pre-loaded inputs
         output_df = model.run(
@@ -590,6 +591,7 @@ def run_model(
             "version": model.info.get("version", "unknown"),
             "rows": int(len(output_df)),
             "layer": "processed",
+            "output": output_df,  # Include output DataFrame for downstream models
         }
 
     # Attach metadata for DAG validation and auto-injection

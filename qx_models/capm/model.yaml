@@ -131,7 +131,7 @@ output:
         type: date
         description: Filter by forecast date
 
-    path_template: "data/processed/{domain}/{asset_class}/{subdomain}/{subtype}/date={date}/part-{run_id}.parquet"
+    path_template: data/processed/{output_type}/model={model}/run_date={run_date}
 
 parameters:
   horizon_d:
