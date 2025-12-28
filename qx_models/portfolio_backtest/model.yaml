@@ -1,0 +1,206 @@
+# ============================================================================
+# Model Configuration: Portfolio Backtest
+# ============================================================================
+
+model:
+  id: portfolio_backtest_model
+  version: 1.0.0
+  description: "Backtests portfolio time series using actual OHLCV data to calculate realized returns, turnover, transaction costs, and performance metrics"
+
+# ============================================================================
+# INPUTS: Processed datasets (from models) and curated datasets (from builders)
+# ============================================================================
+inputs:
+  - name: portfolio_weights
+    required: true
+    type:
+      domain: derived-metrics
+      asset_class: equity
+      subdomain: positions
+      region: null
+      frequency: null
+    description: "Time series of portfolio weights from optimizer (symbol, optimization_date, weight)"
+
+  - name: equity_prices
+    required: true
+    type:
+      domain: market-data
+      asset_class: equity
+      subdomain: bars
+      frequency: monthly
+      region: null
+    description: "Monthly OHLCV data for calculating realized returns"
+
+# ============================================================================
+# OUTPUT: Backtest performance results
+# ============================================================================
+output:
+  type:
+    domain: derived-metrics
+    subdomain: backtest-results
+  description: "Backtest performance metrics including returns, turnover, Sharpe ratio, drawdowns"
+
+  schema:
+    schema_version: schema_v1
+
+    columns:
+      - name: date
+        type: date
+        description: Observation date
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: portfolio_value
+        type: float
+        description: Portfolio value after rebalancing
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: cash
+        type: float
+        description: Cash balance
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: portfolio_return
+        type: float
+        description: Period return (decimal)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: turnover
+        type: float
+        description: Two-way turnover (decimal)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: transaction_cost
+        type: float
+        description: Transaction cost in dollars
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: transaction_cost_bps
+        type: float
+        description: Transaction cost in basis points
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: positions_count
+        type: int
+        description: Number of active positions
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: is_rebalance
+        type: bool
+        description: Whether this is a rebalancing date
+        required: true
+        filterable: true
+        filter_type: exact
+
+      - name: cumulative_return
+        type: float
+        description: Cumulative return since inception
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: rolling_vol_12m
+        type: float
+        description: Rolling 12-month volatility
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: rolling_sharpe_12m
+        type: float
+        description: Rolling 12-month Sharpe ratio
+        required: false
+        filterable: true
+        filter_type: range
+
+      - name: drawdown
+        type: float
+        description: Current drawdown from peak
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: max_drawdown_to_date
+        type: float
+        description: Maximum drawdown to date
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: cumulative_turnover
+        type: float
+        description: Cumulative turnover since inception
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: cumulative_transaction_cost
+        type: float
+        description: Cumulative transaction costs in dollars
+        required: true
+        filterable: true
+        filter_type: range
+
+    partition_keys:
+      - model
+      - run_date
+
+    path_template: data/processed/{output_type}/model={model}/run_date={run_date}
+
+# ============================================================================
+# PARAMETERS: Backtest configuration
+# ============================================================================
+parameters:
+  transaction_cost_bps:
+    type: float
+    default: 10.0
+    description: "One-way transaction cost in basis points (10 bps = 0.1%)"
+
+  rebalance_frequency:
+    type: string
+    default: "monthly"
+    allowed:
+      - monthly
+      - quarterly
+      - annual
+    description: "Portfolio rebalancing frequency"
+
+  initial_capital:
+    type: float
+    default: 1000000.0
+    description: "Initial capital in dollars for AUM tracking"
+
+  slippage_bps:
+    type: float
+    default: 5.0
+    description: "Market impact slippage in basis points"
+
+  calculate_drawdowns:
+    type: bool
+    default: true
+    description: "Whether to calculate drawdown metrics"
+
+  calculate_factor_exposures:
+    type: bool
+    default: false
+    description: "Whether to calculate factor exposures over time"
+
+  min_weight_threshold:
+    type: float
+    default: 0.001
+    description: "Minimum weight to consider as active position (0.1%)"
