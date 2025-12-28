@@ -88,6 +88,21 @@ inputs:
       frequency: monthly
     description: |
       ESG factor returns from esg_factor model.
+
+  # Membership intervals (optional - to filter delisted stocks)
+  - name: membership_intervals
+    required: false
+    type:
+      domain: instrument-reference
+      asset_class: equity
+      subdomain: index-constituents
+      region: null
+      frequency: null
+    description: |
+      Membership intervals dataset to filter out delisted stocks.
+      Contains: ticker, start_date, end_date (periods when stock was listed/active).
+      If provided, expected returns will ONLY be generated for dates when stock was active.
+      Prevents selecting delisted stocks (e.g., AABA after Jun 2019).
       Used to estimate ESG risk premium (λ_ESG) via HAC-robust mean.
       Typically uses "ESG" factor (composite), but can use E, S, G, or ESG_mom.
 
@@ -271,7 +286,7 @@ parameters:
   # Factor premium estimation (shrinkage correction for sample period bias)
   apply_shrinkage:
     type: bool
-    default: true
+    default: false # ← CHANGED: Accept sample estimates (including negative ESG premium)
     description: |
       Apply shrinkage to factor premia toward historical long-term means.
 
@@ -281,7 +296,12 @@ parameters:
 
       where w is shrinkage_weight.
 
-      Recommended: true for short sample periods (< 20 years)
+      false: Use sample estimates from data (accept negative ESG premium if observed)
+      true: Blend with historical priors (override negative premiums)
+
+      Recommended:
+        - false: Trust your data (accept negative ESG premium) ← DEFAULT
+        - true: Apply priors (force positive ESG premium via shrinkage)
 
   shrinkage_weight:
     type: float
@@ -358,47 +378,50 @@ parameters:
 
   beta_market_cap:
     type: float
-    default: 3.0
+    default: 2.0
     min: 1.0
     max: 10.0
     description: |
       Cap for market beta (symmetric: [-cap, +cap]).
 
-      Default: 3.0 (β_market ∈ [-3, 3])
+      Default: 2.0 (β_market ∈ [-2, 2]) based on 99th percentile ~1.94
 
       Typical ranges:
         - Most stocks: |β_market| < 2.0
         - High-volatility stocks: |β_market| = 2.0-3.0
-        - Extreme cases: |β_market| > 3.0 (capped)
+        - Extreme cases: |β_market| > 2.0 (capped to prevent unrealistic ER)
 
   beta_esg_cap:
     type: float
-    default: 5.0
+    default: 1.5 # Based on 99th percentile ~1.78
     min: 1.0
     max: 10.0
     description: |
       Cap for ESG beta (symmetric: [-cap, +cap]).
 
-      Default: 5.0 (β_ESG ∈ [-5, 5])
+      Default: 1.5 (β_ESG ∈ [-1.5, 1.5]) based on 99th percentile ~1.78
 
-      ESG betas are typically more variable than market betas:
-        - Most stocks: |β_ESG| < 3.0
-        - High-exposure stocks: |β_ESG| = 3.0-5.0
-        - Extreme cases: |β_ESG| > 5.0 (capped)
+      NOTE: With negative ESG premium (-0.496%/mo), extreme ESG betas
+      amplify expected returns significantly:
+        - β_ESG=-1.5 gives +0.75%/mo (+9%/yr) boost
+        - β_ESG=-2.0 gives +1.0%/mo (+12%/yr) boost
+
+      Cap limits unrealistic expected returns from ESG factor exposures.
 
   use_latest_betas:
     type: bool
-    default: true
+    default: false # ← CHANGED: Prevents look-ahead bias
     description: |
       Use latest beta estimates (constant across time) or time-varying betas.
 
       true: Use most recent beta estimate for each stock, apply to all forecast dates
             (Cross-sectional betas from full sample)
+            ⚠️ WARNING: This creates look-ahead bias in backtests!
 
       false: Use time-series of beta estimates (e.g., from rolling window regression)
              Most recent available beta used for each forecast date
-             (Time-varying betas)
+             (Time-varying betas, no look-ahead bias)
 
       Recommended:
-        - true: For stable stocks, longer horizons
-        - false: For dynamic stocks, changing business models
+        - false: For backtesting (prevents look-ahead bias) ← DEFAULT
+        - true: For forward-looking analysis only (production forecasts)

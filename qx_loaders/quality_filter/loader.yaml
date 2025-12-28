@@ -1,0 +1,109 @@
+# ============================================================================
+# Quality Filter Loader Configuration
+# ============================================================================
+#
+# Filters stocks based on quality metrics to exclude:
+# - Penny stocks (low price)
+# - Distressed stocks (extreme volatility)
+# - Delisted/bankrupt stocks (missing data)
+#
+# This prevents the portfolio optimizer from selecting stocks with high
+# bankruptcy risk that have artificially high expected returns due to
+# extreme beta estimates.
+# ============================================================================
+
+loader:
+  id: quality_filter_loader
+  version: 1.0.0
+  description: |
+    Filter stocks by quality metrics to exclude penny stocks, distressed
+    companies, and stocks with poor data quality.
+
+    Returns list of symbols that pass ALL quality filters.
+
+# ============================================================================
+# INPUTS: Required datasets
+# ============================================================================
+inputs:
+  - name: equity_prices
+    required: true
+    dataset_type:
+      domain: market-data
+      subdomain: bars
+    description: "OHLCV data for filtering by price and volatility"
+
+# ============================================================================
+# PARAMETERS: Filter thresholds
+# ============================================================================
+parameters:
+  min_price:
+    type: float
+    default: 5.0
+    min: 0.0
+    description: |
+      Minimum median price (USD) over lookback period.
+
+      Default: 5.0 (exclude penny stocks)
+
+      Rationale: Stocks trading below $5 are often distressed, have
+      high spreads, and face delisting risk.
+
+  max_volatility:
+    type: float
+    default: 0.10
+    min: 0.0
+    max: 1.0
+    description: |
+      Maximum daily return volatility (annualized) over lookback period.
+
+      Default: 0.10 (10% daily vol = 159% annual)
+
+      Rationale: Extreme volatility indicates distress, poor fundamentals,
+      or meme stock behavior. Standard stocks have <50% annual vol.
+
+  min_trading_days:
+    type: int
+    default: 40
+    min: 1
+    description: |
+      Minimum number of trading days with data in lookback period.
+
+      Default: 40 (out of ~60 trading days in 3 months)
+
+      Rationale: Sparse data indicates poor liquidity, potential delisting,
+      or data quality issues.
+
+  lookback_months:
+    type: int
+    default: 3
+    min: 1
+    max: 12
+    description: |
+      Number of months to look back for quality checks.
+
+      Default: 3 (recent quality check)
+
+      Rationale: Recent price/volatility matters more than historical.
+      3 months captures recent distress signals.
+
+  filter_date:
+    type: str
+    required: true
+    description: |
+      Date for quality filtering (YYYY-MM-DD).
+
+      Quality metrics are calculated over [filter_date - lookback_months, filter_date].
+
+      In DAG context: Use end date of analysis period.
+
+# ============================================================================
+# OUTPUT: Validation rules
+# ============================================================================
+output:
+  type: list
+  item_type: str
+  validation:
+    allow_empty: false
+    min_length: 1
+    item_pattern: "^[A-Z0-9.\\-]+$"
+    description: "List of symbols passing quality filters"

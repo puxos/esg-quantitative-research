@@ -78,10 +78,11 @@ class ESGFactorModel(BaseModel):
         lag_signal = params["lag_signal"]
         weighting = params["weighting"]
         return_legs = params["return_legs"]
+        winsorize_returns = params.get("winsorize_returns", True)
 
         logger.info(
             f"\nParameters: quantile={quantile}, sector_neutral={sector_neutral}, "
-            f"weighting={weighting}, signal_lag={lag_signal}"
+            f"weighting={weighting}, signal_lag={lag_signal}, winsorize={winsorize_returns}"
         )
 
         # Resample daily data to monthly
@@ -137,6 +138,7 @@ class ESGFactorModel(BaseModel):
                 quantile=quantile,
                 lag_signal=lag_signal,
                 return_legs=return_legs,
+                winsorize_returns=winsorize_returns,
             )
             factors.append(factor_df)
             logger.info(f"   ✓ {col}: {len(factor_df)} observations")
@@ -154,6 +156,7 @@ class ESGFactorModel(BaseModel):
                 quantile=quantile,
                 lag_signal=lag_signal,
                 return_legs=return_legs,
+                winsorize_returns=winsorize_returns,
             )
             factors.append(esg_mom_factor)
             logger.info(f"   ✓ ESG_mom: {len(esg_mom_factor)} observations")
@@ -396,6 +399,7 @@ class ESGFactorModel(BaseModel):
         quantile: float,
         lag_signal: int,
         return_legs: bool,
+        winsorize_returns: bool = True,
     ) -> pd.DataFrame:
         """Build long-short factor from signal"""
         # Lag signals
@@ -464,6 +468,10 @@ class ESGFactorModel(BaseModel):
             if np.isnan(r_long) or np.isnan(r_short):
                 continue
 
+            # Winsorize leg returns to cap extreme outliers
+            if winsorize_returns:
+                pass  # Will be applied after collecting all results
+
             if return_legs:
                 results.append(
                     {
@@ -483,6 +491,68 @@ class ESGFactorModel(BaseModel):
                     }
                 )
 
+        # Apply winsorization across all observations
+        if winsorize_returns and results:
+            results_df = pd.DataFrame(results)
+
+            logger.info(
+                f"      🔍 Winsorization check: winsorize_returns={winsorize_returns}, return_legs={return_legs}, results={len(results)}"
+            )
+            logger.info(f"      🔍 DataFrame columns: {results_df.columns.tolist()}")
+
+            if return_legs:
+                # Check if columns exist
+                if (
+                    "long_return" not in results_df.columns
+                    or "short_return" not in results_df.columns
+                ):
+                    logger.error(
+                        f"      ❌ Missing leg return columns! Has: {results_df.columns.tolist()}"
+                    )
+                    return results_df
+
+                # Winsorize long and short legs separately at 1%/99%
+                long_lower = results_df["long_return"].quantile(0.01)
+                long_upper = results_df["long_return"].quantile(0.99)
+                short_lower = results_df["short_return"].quantile(0.01)
+                short_upper = results_df["short_return"].quantile(0.99)
+
+                logger.info(
+                    f"      🔍 BEFORE winsorization - long: [{results_df['long_return'].min():.4f}, {results_df['long_return'].max():.4f}], "
+                    f"short: [{results_df['short_return'].min():.4f}, {results_df['short_return'].max():.4f}]"
+                )
+
+                results_df["long_return"] = results_df["long_return"].clip(
+                    long_lower, long_upper
+                )
+                results_df["short_return"] = results_df["short_return"].clip(
+                    short_lower, short_upper
+                )
+
+                logger.info(
+                    f"      🔍 AFTER winsorization - long: [{results_df['long_return'].min():.4f}, {results_df['long_return'].max():.4f}], "
+                    f"short: [{results_df['short_return'].min():.4f}, {results_df['short_return'].max():.4f}]"
+                )
+
+                # Recalculate factor return after winsorization
+                results_df["factor_return"] = (
+                    results_df["long_return"] - results_df["short_return"]
+                )
+
+                logger.info(
+                    f"      ✅ Winsorized long: [{long_lower:.4f}, {long_upper:.4f}], "
+                    f"short: [{short_lower:.4f}, {short_upper:.4f}]"
+                )
+            else:
+                logger.warning(
+                    f"      ⚠️ Skipping winsorization because return_legs={return_legs}"
+                )
+
+            return results_df
+
+        logger.warning(
+            f"      ⚠️ Winsorization skipped: winsorize_returns={winsorize_returns}, results={len(results) if results else 0}"
+        )
         return pd.DataFrame(results)
 
     @staticmethod

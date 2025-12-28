@@ -302,6 +302,14 @@ parameters:
     default: true
     description: "Whether to return separate long/short leg returns (for analysis)"
 
+  winsorize_returns:
+    type: bool
+    default: true
+    description: |
+      Winsorize portfolio leg returns at 1%/99% percentiles to cap extreme outliers.
+      Prevents contamination from extreme events (e.g., Jan 2021: -21% ESG factor due to short leg +20.5%).
+      Applies AFTER forming portfolios but BEFORE calculating long-short factor returns.
+
 metadata:
   author: Qx System
   created: 2025-12-04

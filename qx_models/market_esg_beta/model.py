@@ -100,6 +100,8 @@ class MarketESGBetaModel(BaseModel):
         esg_factor_name = params["esg_factor_name"]
         window_size = params["window_size"]
         min_observations = params["min_observations"]
+        min_r_squared = params.get("min_r_squared", 0.10)
+        winsorize_returns = params.get("winsorize_returns", True)
         use_hac_se = params["use_hac_se"]
         hac_maxlags = params["hac_maxlags"]
 
@@ -107,6 +109,8 @@ class MarketESGBetaModel(BaseModel):
         logger.info(f"  ESG factor: {esg_factor_name}")
         logger.info(f"  Window: {window_size if window_size else 'Full sample'}")
         logger.info(f"  Min observations: {min_observations}")
+        logger.info(f"  Min R²: {min_r_squared}")
+        logger.info(f"  Winsorize returns: {winsorize_returns}")
         logger.info(f"  HAC standard errors: {use_hac_se}")
         if use_hac_se:
             logger.info(f"  HAC max lags: {hac_maxlags}")
@@ -116,7 +120,9 @@ class MarketESGBetaModel(BaseModel):
 
         # Resample daily data to monthly
         logger.info("  Resampling daily prices to monthly...")
-        stock_returns = self._prepare_stock_returns(equity_prices, rf_df)
+        stock_returns = self._prepare_stock_returns(
+            equity_prices, rf_df, winsorize=winsorize_returns
+        )
         market_excess = self._prepare_market_returns(market_prices, rf_df)
 
         # Prepare ESG factor (already monthly from ESGFactorModel)
@@ -210,6 +216,22 @@ class MarketESGBetaModel(BaseModel):
         # Combine results
         result_df = pd.DataFrame(all_results)
 
+        # Filter by R² threshold if specified
+        initial_count = len(result_df)
+        if min_r_squared > 0:
+            result_df = result_df[result_df["r_squared"] >= min_r_squared].copy()
+            filtered_count = initial_count - len(result_df)
+            logger.info(f"\n📊 R² Filtering:")
+            logger.info(f"   Threshold: R² >= {min_r_squared}")
+            logger.info(
+                f"   Filtered out: {filtered_count} results ({filtered_count/initial_count*100:.1f}%)"
+            )
+            logger.info(f"   Kept: {len(result_df)} results")
+
+            if len(result_df) == 0:
+                logger.warning("⚠️ All results filtered out by R² threshold!")
+                return pd.DataFrame()
+
         logger.info(f"\n✅ Completed regressions:")
         logger.info(f"   Success: {success_count} stocks")
         logger.info(f"   Failed: {fail_count} stocks")
@@ -227,9 +249,9 @@ class MarketESGBetaModel(BaseModel):
 
     @staticmethod
     def _prepare_stock_returns(
-        prices_df: pd.DataFrame, rf_df: pd.DataFrame
+        prices_df: pd.DataFrame, rf_df: pd.DataFrame, winsorize: bool = True
     ) -> pd.DataFrame:
-        """Prepare monthly stock excess returns"""
+        """Prepare monthly stock excess returns with optional winsorization"""
         # Resample daily to monthly (end of month)
         prices_df = prices_df.copy()
         prices_df["date"] = pd.to_datetime(prices_df["date"])
@@ -246,6 +268,15 @@ class MarketESGBetaModel(BaseModel):
 
         # Calculate returns
         monthly["return"] = monthly.groupby("symbol")["close"].pct_change()
+
+        # Winsorize returns if requested (cap extreme outliers at 1%/99% percentiles)
+        if winsorize:
+            lower = monthly["return"].quantile(0.01)
+            upper = monthly["return"].quantile(0.99)
+            monthly["return"] = monthly["return"].clip(lower=lower, upper=upper)
+            logger.info(
+                f"Winsorized returns: [{lower*100:.2f}%, {upper*100:.2f}%] (1%/99% percentiles)"
+            )
 
         # Resample RF to monthly
         rf_monthly = MarketESGBetaModel._resample_rf_to_monthly(rf_df)

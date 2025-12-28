@@ -312,12 +312,46 @@ parameters:
 
   min_observations:
     type: int
-    default: 36
+    default: 48 # INCREASED: 36 → 48 for better stability
     min: 24
     max: 60
     description: |
       Minimum number of monthly observations required.
-      Default 36 = 3 years (standard for monthly factor models)
+      Default 48 = 4 years (increased from 36 for better stability)
+
+      Rationale: Distressed stocks with 3-year history often have
+      unstable betas. 4 years provides more robust estimates.
+
+  min_r_squared:
+    type: float
+    default: 0.10
+    min: 0.0
+    max: 1.0
+    description: |
+      Minimum R² threshold for keeping beta estimates.
+
+      Default: 0.10 (10%)
+
+      Betas with R² < 0.10 are poorly fit and unreliable. The regression
+      explains <10% of variance, making beta estimates meaningless.
+
+      Example: CHK had R²=0.15 with β=93. Filtering R²<0.10 removes worst cases.
+
+      Set to 0.0 to disable filtering (not recommended).
+
+  winsorize_returns:
+    type: bool
+    default: true
+    description: |
+      Winsorize returns at 1%/99% percentiles before regression.
+
+      Default: true (recommended)
+
+      Rationale: Extreme return outliers (e.g., +500% intraday spikes,
+      -99% delisting) distort beta estimates. Winsorizing caps extreme
+      values while preserving overall distribution.
+
+      Example: Without winsorizing, one +1000% return can inflate beta to 50+.
 
   use_hac_se:
     type: bool

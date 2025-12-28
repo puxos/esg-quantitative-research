@@ -10,7 +10,7 @@ This implementation focuses on two-factor model (market + ESG):
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -54,7 +54,7 @@ class FactorExpectedReturnsModel(BaseModel):
 
         Args:
             inputs: Dictionary of input DataFrames
-                - two_factor_betas: Factor betas (symbol, date, beta_market, beta_esg)
+                - market_esg_betas: Factor betas (symbol, date, beta_market, beta_esg)
                 - market_prices: Market portfolio prices (SPY)
                 - risk_free: Risk-free rate time-series
                 - esg_factors: ESG factor returns
@@ -67,10 +67,11 @@ class FactorExpectedReturnsModel(BaseModel):
         logger.info("Starting Factor Expected Returns calculation")
 
         # Extract inputs
-        betas_df = inputs["two_factor_betas"]
+        betas_df = inputs["market_esg_betas"]
         market_prices = inputs["market_prices"]
         rf_df = inputs["risk_free"]
         esg_factors = inputs["esg_factors"]
+        membership_df = inputs.get("membership_intervals")  # Optional
 
         # Extract parameters
         apply_shrinkage = params.get("apply_shrinkage", True)
@@ -81,7 +82,7 @@ class FactorExpectedReturnsModel(BaseModel):
         cap_betas = params.get("cap_betas", True)
         beta_market_cap = params.get("beta_market_cap", 3.0)
         beta_esg_cap = params.get("beta_esg_cap", 5.0)
-        use_latest_betas = params.get("use_latest_betas", True)
+        use_latest_betas = params.get("use_latest_betas", False)
 
         # Get date range from kwargs (if not provided, use RF date range)
         date_range = kwargs.get("date_range")
@@ -133,6 +134,7 @@ class FactorExpectedReturnsModel(BaseModel):
             cap_betas=cap_betas,
             beta_market_cap=beta_market_cap,
             beta_esg_cap=beta_esg_cap,
+            membership_df=membership_df,
         )
 
         logger.info(
@@ -169,7 +171,7 @@ class FactorExpectedReturnsModel(BaseModel):
 
         # Resample to monthly (end of month)
         df = df.set_index("date")
-        monthly = df["adjClose"].resample("ME").last()
+        monthly = df["adj_close"].resample("ME").last()
         market_returns = monthly.pct_change().dropna()
 
         # Get monthly RF rate
@@ -198,7 +200,7 @@ class FactorExpectedReturnsModel(BaseModel):
         Prepare ESG factor returns (monthly).
 
         Args:
-            esg_factors: ESG factor returns (monthly)
+            esg_factors: ESG factor returns (monthly, wide format)
             start_date: Start date for analysis
             end_date: End date for analysis
 
@@ -207,22 +209,28 @@ class FactorExpectedReturnsModel(BaseModel):
         """
         df = esg_factors.copy()
 
-        # Filter to ESG factor (composite)
-        if "factor_name" in df.columns:
-            df = df[df["factor_name"] == "ESG"]
-
         # Convert date column to datetime
         df["date"] = pd.to_datetime(df["date"])
         df = df[(df["date"] >= start_date) & (df["date"] <= end_date)]
         df = df.sort_values("date")
 
-        # Extract returns
-        if "long_short_return" in df.columns:
+        # Extract returns - ESG factor model outputs wide format with ESG_factor column
+        if "ESG_factor" in df.columns:
+            esg_series = df.set_index("date")["ESG_factor"]
+        elif "long_short_return" in df.columns:
+            # Legacy format support
+            if "factor_name" in df.columns:
+                df = df[df["factor_name"] == "ESG"]
             esg_series = df.set_index("date")["long_short_return"]
         elif "return" in df.columns:
+            # Legacy format support
+            if "factor_name" in df.columns:
+                df = df[df["factor_name"] == "ESG"]
             esg_series = df.set_index("date")["return"]
         else:
-            raise ValueError("ESG factors DataFrame missing return column")
+            raise ValueError(
+                "ESG factors DataFrame missing return column (expected 'ESG_factor', 'long_short_return', or 'return')"
+            )
 
         logger.info(f"Prepared {len(esg_series)} monthly ESG factor returns")
         logger.info(
@@ -430,6 +438,7 @@ class FactorExpectedReturnsModel(BaseModel):
         cap_betas: bool,
         beta_market_cap: float,
         beta_esg_cap: float,
+        membership_df: Optional[pd.DataFrame] = None,
     ) -> pd.DataFrame:
         """
         Calculate expected returns using factor model formula.
@@ -555,6 +564,51 @@ class FactorExpectedReturnsModel(BaseModel):
 
         results_df = pd.DataFrame(results)
         results_df = results_df.sort_values(["symbol", "date"])
+
+        # Filter out delisted stocks if membership intervals provided
+        if membership_df is not None and not membership_df.empty:
+            logger.info("Filtering expected returns for active membership only...")
+
+            # Standardize column names
+            membership = membership_df.copy()
+            if "ticker" in membership.columns:
+                membership = membership.rename(columns={"ticker": "symbol"})
+
+            # Convert dates to datetime
+            membership["start_date"] = pd.to_datetime(membership["start_date"])
+            membership["end_date"] = pd.to_datetime(membership["end_date"])
+            results_df["date"] = pd.to_datetime(results_df["date"])
+
+            # Filter: keep only rows where date is within [start_date, end_date]
+            filtered_results = []
+            for symbol in results_df["symbol"].unique():
+                symbol_er = results_df[results_df["symbol"] == symbol]
+                symbol_membership = membership[membership["symbol"] == symbol]
+
+                if symbol_membership.empty:
+                    # No membership data - skip this symbol entirely
+                    continue
+
+                for _, row in symbol_er.iterrows():
+                    date = row["date"]
+                    # Check if date falls within any membership interval
+                    is_active = symbol_membership[
+                        (symbol_membership["start_date"] <= date)
+                        & (symbol_membership["end_date"] >= date)
+                    ]
+                    if not is_active.empty:
+                        filtered_results.append(row)
+
+            original_count = len(results_df)
+            results_df = pd.DataFrame(filtered_results)
+            filtered_count = original_count - len(results_df)
+
+            logger.info(
+                f"  Filtered {filtered_count} delisted stock observations ({filtered_count/original_count*100:.1f}%)"
+            )
+            logger.info(
+                f"  Remaining: {len(results_df)} observations, {results_df['symbol'].nunique()} unique symbols"
+            )
 
         # Log capping statistics
         if cap_betas:
