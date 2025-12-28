@@ -48,6 +48,8 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import pandas as pd
+
 from qx.common.contracts import DatasetRegistry
 from qx.common.types import AssetClass, DatasetType, Domain, Frequency, Region
 from qx.engine.base_model import BaseModel
@@ -538,6 +540,8 @@ def run_model(
 
         # Extract pre-loaded inputs from loader/model outputs in context (if available)
         inputs_df = None
+        extra_kwargs = {}  # Initialize early for non-DataFrame outputs
+
         if ctx is not None and input_mappings is not None:
             # Map input names to loader/model outputs from dependencies
             # Model YAML declares inputs with names (e.g., "equity_prices", "expected_returns", "market_betas")
@@ -573,7 +577,74 @@ def run_model(
                     print(
                         f"  ✅ All {len(inputs_df)} required inputs mapped from loader/model outputs"
                     )
-            else:
+
+            # Also check for non-DataFrame loader outputs (e.g., constraints dict)
+            # AUTO-MERGE DETECTION: Automatically detect and merge ConstraintDSL outputs
+            # These get passed via kwargs instead of inputs_df
+            extra_kwargs = {}
+            constraint_dsls = []  # Collect all ConstraintDSL outputs for auto-merge
+
+            if input_mappings:
+                for input_name, potential_tasks in input_mappings.items():
+                    # Skip if already in inputs_df
+                    if input_name in (inputs_df or {}):
+                        continue
+
+                    # Check context for this input
+                    for task_id in potential_tasks:
+                        if task_id in ctx and isinstance(ctx[task_id], dict):
+                            task_result = ctx[task_id]
+                            if "output" in task_result and not isinstance(
+                                task_result["output"], pd.DataFrame
+                            ):
+                                output = task_result["output"]
+
+                                # Check if output is ConstraintDSL
+                                from qx.engine.constraint_dsl import ConstraintDSL
+
+                                if isinstance(output, ConstraintDSL):
+                                    # Collect for auto-merge
+                                    constraint_dsls.append(output)
+                                    print(
+                                        f"  ✓ Detected ConstraintDSL from {task_id} ({len(output.constraints)} constraints)"
+                                    )
+                                else:
+                                    # Non-DataFrame, non-ConstraintDSL output (legacy)
+                                    extra_kwargs[input_name] = output
+                                    output_type = task_result.get(
+                                        "output_type", "unknown"
+                                    )
+                                    output_size = task_result.get("output_size", "?")
+                                    print(
+                                        f"  ✓ Mapped {task_id} → {input_name} ({output_type}, size={output_size})"
+                                    )
+                                break
+
+            # AUTO-MERGE: If multiple ConstraintDSL outputs detected, merge them
+            if constraint_dsls:
+                from qx.engine.constraint_merger import merge_constraint_dsls
+
+                if len(constraint_dsls) == 1:
+                    # Single DSL, pass directly
+                    merged_dsl = constraint_dsls[0]
+                    print(
+                        f"  ✓ Using single ConstraintDSL ({len(merged_dsl.constraints)} constraints)"
+                    )
+                else:
+                    # Multiple DSLs, merge them
+                    merged_dsl = merge_constraint_dsls(*constraint_dsls)
+                    total_constraints = sum(
+                        len(dsl.constraints) for dsl in constraint_dsls
+                    )
+                    print(
+                        f"  ✅ Auto-merged {len(constraint_dsls)} ConstraintDSL objects "
+                        f"({total_constraints} total constraints)"
+                    )
+
+                # Pass merged DSL as constraint_dsl kwarg
+                extra_kwargs["constraint_dsl"] = merged_dsl
+
+            if not input_mappings:
                 # No mappings found, fall back to storage
                 inputs_df = None
 
@@ -583,6 +654,7 @@ def run_model(
             partitions_by_input=partitions or {},
             inputs_df=inputs_df,
             run_id=run_id,
+            **extra_kwargs,  # Pass non-DataFrame loader outputs (e.g., constraints)
         )
 
         return {

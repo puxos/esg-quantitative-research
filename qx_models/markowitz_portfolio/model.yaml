@@ -48,39 +48,8 @@ inputs:
 
       Must contain: symbol, date, ER_monthly
 
-  # Two-factor betas (for ESG exposure constraint)
-  - name: two_factor_betas
-    required: false
-    type:
-      domain: derived-metrics
-      asset_class: equity
-      subdomain: factor-exposures
-      subtype: null
-      region: null
-      frequency: null
-    description: |
-      Factor betas from two_factor_regression model.
-      ESG beta (β_ESG) used for ESG exposure constraint: L ≤ β'w ≤ U
-
-      Must contain: symbol, beta_esg
-
-      If not provided, will use market betas from market_beta model instead.
-
-  # Market betas (fallback if two_factor_betas not available)
-  - name: market_betas
-    required: false
-    type:
-      domain: derived-metrics
-      asset_class: equity
-      subdomain: factor-exposures
-      subtype: market-beta
-      region: null
-      frequency: null
-    description: |
-      Market betas from market_beta model (fallback).
-      Used if two_factor_betas not provided.
-
-      Must contain: symbol, beta
+      NOTE: Portfolio constraints injected via DAG context (not declared as input).
+      Use PortfolioConstraintsLoader → BuildConstraints → INPUT_MAPPINGS.
 
   # Historical prices (for covariance estimation)
   - name: equity_prices
@@ -110,21 +79,6 @@ inputs:
     description: |
       Risk-free rate for calculating excess returns.
       Used in covariance estimation (excess return covariance).
-
-  # Sector metadata (optional, for sector constraints)
-  - name: sector_mapping
-    required: false
-    type:
-      domain: metadata
-      asset_class: equity
-      subdomain: null
-      region: null
-      frequency: null
-    description: |
-      GICS sector mapping (ticker → sector).
-      Required only if sector_constraints=true.
-
-      If not provided, sector constraints will be skipped.
 
 output:
   type:
@@ -367,12 +321,15 @@ parameters:
         γ=4 means investor requires 4 units of expected return
         to accept 1 unit of variance increase.
 
-  # Portfolio constraints
+  # Portfolio constraints (LEGACY - use PortfolioConstraintsLoader instead)
   long_only:
     type: bool
     default: true
     description: |
-      Restrict to long-only positions (w ≥ 0).
+      [LEGACY] Restrict to long-only positions (w ≥ 0).
+
+      **DEPRECATED**: Use PortfolioConstraintsLoader with box_constraints instead.
+      Only used if 'constraints' input is not provided.
 
       true: No short selling (typical for retail/institutional)
       false: Allow short positions (hedge funds, market-neutral)
@@ -383,7 +340,10 @@ parameters:
     min: 0.01
     max: 1.0
     description: |
-      Maximum position size per stock (w_i ≤ position_max).
+      [LEGACY] Maximum position size per stock (w_i ≤ position_max).
+
+      **DEPRECATED**: Use PortfolioConstraintsLoader with box_constraints instead.
+      Only used if 'constraints' input is not provided.
 
       Prevents excessive concentration:
         - 0.05 (5%): Highly diversified (20+ holdings)
@@ -395,12 +355,15 @@ parameters:
         - UCITS: 10% per position
         - SEC: 5% for diversified funds
 
-  # ESG exposure constraints
+  # ESG exposure constraints (LEGACY - use PortfolioConstraintsLoader instead)
   esg_neutral:
     type: bool
     default: false
     description: |
-      Enforce ESG-neutral portfolio (β_ESG'w ≈ 0).
+      [LEGACY] Enforce ESG-neutral portfolio (β_ESG'w ≈ 0).
+
+      **DEPRECATED**: Use PortfolioConstraintsLoader with esg_neutral parameter instead.
+      Only used if 'constraints' input is not provided.
 
       true: ESG exposure in [-0.05, 0.05] (neutral)
       false: No ESG constraint (let optimizer decide)
@@ -411,7 +374,10 @@ parameters:
     type: float
     default: null
     description: |
-      Custom ESG lower bound (L_ESG in constraint).
+      [LEGACY] Custom ESG lower bound (L_ESG in constraint).
+
+      **DEPRECATED**: Use PortfolioConstraintsLoader with esg_lower_bound parameter instead.
+      Only used if 'constraints' input is not provided.
 
       Constraint: β_ESG'w ≥ esg_lower_bound
 
@@ -425,7 +391,10 @@ parameters:
     type: float
     default: null
     description: |
-      Custom ESG upper bound (U_ESG in constraint).
+      [LEGACY] Custom ESG upper bound (U_ESG in constraint).
+
+      **DEPRECATED**: Use PortfolioConstraintsLoader with esg_upper_bound parameter instead.
+      Only used if 'constraints' input is not provided.
 
       Constraint: β_ESG'w ≤ esg_upper_bound
 
@@ -434,12 +403,15 @@ parameters:
         - 0.0: Cap ESG exposure at zero
         - 0.5: Moderate ESG tilt
 
-  # Sector concentration constraints
+  # Sector concentration constraints (LEGACY - use PortfolioConstraintsLoader instead)
   sector_constraints:
     type: bool
     default: false
     description: |
-      Apply GICS sector concentration limits.
+      [LEGACY] Apply GICS sector concentration limits.
+
+      **DEPRECATED**: Use PortfolioConstraintsLoader with sector_caps constraint instead.
+      Only used if 'constraints' input is not provided.
 
       true: Enforce Σw[sector] ≤ sector_cap for each sector
       false: No sector constraints
@@ -452,12 +424,10 @@ parameters:
     min: 0.10
     max: 1.0
     description: |
-      Maximum allocation per GICS sector (if sector_constraints=true).
+      [LEGACY] Maximum allocation per GICS sector (if sector_constraints=true).
 
-      Prevents sector concentration risk:
-        - 0.20 (20%): Aggressive diversification
-        - 0.30 (30%): Balanced (default)
-        - 0.50 (50%): Allow sector concentration
+      **DEPRECATED**: Use PortfolioConstraintsLoader with sector_cap parameter instead.
+      Only used if 'constraints' input is not provided.
 
   # Covariance estimation
   lookback_months:
@@ -552,3 +522,22 @@ parameters:
         - Visualizing risk-return tradeoff
         - Selecting optimal γ for client risk tolerance
         - Validating optimization robustness
+
+  optimization_date:
+    type: str
+    default: null
+    description: |
+      Specific date for portfolio optimization (YYYY-MM-DD format).
+
+      null: Optimize for all available dates (time series)
+      "2024-12-31": Single optimization for end-of-period portfolio
+
+      Use single-date optimization for:
+        - End-of-study portfolio weights
+        - Single rebalance decision
+        - Ensuring sufficient lookback data exists
+
+      Use multi-date (null) for:
+        - Time series backtest
+        - Rolling portfolio rebalancing
+        - Performance evaluation over time

@@ -1,0 +1,36 @@
+loader:
+  id: basic_constraints_loader
+  version: 1.0.0
+  description: "Basic portfolio constraints (budget, long-only, position limits)"
+
+# No inputs required (generates constraints from parameters only)
+inputs: []
+
+# Parameters for constraint generation (universe-agnostic)
+parameters:
+  budget:
+    type: float
+    default: 1.0
+    description: "Target sum of weights (1.0 = fully invested)"
+
+  long_only:
+    type: bool
+    default: true
+    description: "Disallow shorting (w >= 0)"
+
+  position_max:
+    type: float
+    default: 0.5
+    description: "Maximum weight per position (e.g., 0.5 = 50% max)"
+
+  position_min:
+    type: float
+    default: 0.0
+    description: "Minimum weight per position (only enforced if > 0)"
+
+# Output is ConstraintDSL object
+output:
+  type: ConstraintDSL
+  description: "Constraint specifications for budget and position limits"
+  validation:
+    allow_empty: false

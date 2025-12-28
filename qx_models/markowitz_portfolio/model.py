@@ -1,19 +1,25 @@
 """
 Markowitz Portfolio Optimization Model Implementation
 
-Mean-variance portfolio optimization with ESG controls:
-    Maximize: μ'w - 0.5*γ*w'Σw - λ*||w - w_prev||₁
+Mean-variance portfolio optimization using DSL-based constraints:
+    Minimize: ½γw'Σw - μ'w
+
+This model uses the ConstraintCompiler to transform high-level constraint
+specifications (ConstraintDSL) into canonical QP matrices.
 """
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import cvxpy as cp
 import numpy as np
 import pandas as pd
 
 from qx.engine.base_model import BaseModel
+from qx.engine.constraint_compiler import ConstraintCompiler
+from qx.engine.constraint_dsl import ConstraintDSL
+from qx.engine.qp_problem import QPProblem
 
 logger = logging.getLogger(__name__)
 
@@ -49,47 +55,80 @@ class MarkowitzPortfolioModel(BaseModel):
         **kwargs,
     ) -> pd.DataFrame:
         """
-        Optimize portfolio weights using mean-variance framework.
+        Optimize portfolio weights using mean-variance framework with DSL constraints.
 
         Args:
             inputs: Dictionary of input DataFrames
                 - expected_returns: Expected returns (symbol, date, ER_monthly)
-                - two_factor_betas: Factor betas (symbol, beta_esg)
                 - equity_prices: Historical prices for covariance estimation
                 - risk_free: Risk-free rate time-series
-                - sector_mapping (optional): Sector classification
             params: Model parameters from model.yaml
-            **kwargs: Additional arguments (e.g., optimization_date)
+            **kwargs: Additional arguments
+                - constraints: ConstraintDSL object (required, from constraint loaders)
+                - optimization_date: Specific date or None for all dates
 
         Returns:
             DataFrame with optimal portfolio weights and statistics
         """
-        logger.info("Starting Markowitz Portfolio Optimization")
+        logger.info("Starting Markowitz Portfolio Optimization (DSL-based)")
 
         # Extract inputs
         expected_returns_df = inputs["expected_returns"]
-        two_factor_betas_df = inputs.get("two_factor_betas")
-        market_betas_df = inputs.get("market_betas")
         equity_prices = inputs["equity_prices"]
         risk_free = inputs["risk_free"]
-        sector_mapping_df = inputs.get("sector_mapping")
+
+        # Extract ConstraintDSL from kwargs (passed via DAG context)
+        constraint_dsl: ConstraintDSL = kwargs.get("constraint_dsl")
+
+        # Validate required constraints input
+        if constraint_dsl is None:
+            raise ValueError(
+                "Missing required 'constraint_dsl' input. "
+                "Provide ConstraintDSL via constraint loader(s) in your DAG pipeline. "
+                "Example loaders: basic_constraints, esg_constraints, sector_constraints"
+            )
+
+        if not isinstance(constraint_dsl, ConstraintDSL):
+            raise TypeError(
+                f"Expected ConstraintDSL, got {type(constraint_dsl).__name__}. "
+                "Ensure your constraint loader returns ConstraintDSL."
+            )
+
+        num_symbols = (
+            len(constraint_dsl.symbols)
+            if constraint_dsl.symbols is not None
+            else "<inferred>"
+        )
+        logger.info(
+            f"✅ Received {len(constraint_dsl)} constraint(s) for {num_symbols} symbols"
+        )
+        logger.info(f"   {constraint_dsl.summary()}")
 
         # Extract parameters
         gamma = params.get("gamma", 4.0)
-        long_only = params.get("long_only", True)
-        position_max = params.get("position_max", 0.10)
-        esg_neutral = params.get("esg_neutral", False)
-        esg_lower_bound = params.get("esg_lower_bound")
-        esg_upper_bound = params.get("esg_upper_bound")
-        sector_constraints = params.get("sector_constraints", False)
-        sector_cap = params.get("sector_cap", 0.30)
         lookback_months = params.get("lookback_months", 36)
         shrinkage_intensity = params.get("shrinkage_intensity", 0.25)
         turnover_penalty = params.get("turnover_penalty", 0.0)
         compute_frontier = params.get("compute_frontier", False)
 
         # Get optimization dates (all unique dates or specific date)
-        optimization_date = kwargs.get("optimization_date")
+        # Check params first, then kwargs for backward compatibility
+        print(f"🔍 DEBUG: params keys = {list(params.keys())}")
+        print(f"🔍 DEBUG: kwargs keys = {list(kwargs.keys())}")
+        print(
+            f"🔍 DEBUG: optimization_date in params = {params.get('optimization_date')}"
+        )
+        print(
+            f"🔍 DEBUG: optimization_date in kwargs = {kwargs.get('optimization_date')}"
+        )
+
+        optimization_date = params.get("optimization_date") or kwargs.get(
+            "optimization_date"
+        )
+        if optimization_date is not None and isinstance(optimization_date, str):
+            # Convert string date to Timestamp
+            optimization_date = pd.Timestamp(optimization_date)
+
         if optimization_date is None:
             # Optimize for all available dates (monthly time series)
             all_dates = sorted(expected_returns_df["date"].unique())
@@ -115,10 +154,10 @@ class MarkowitzPortfolioModel(BaseModel):
             optimization_dates = [optimization_date]
             logger.info(f"Optimizing for single date: {optimization_date}")
 
-        logger.info(
-            f"Parameters: gamma={gamma}, position_max={position_max}, "
-            f"esg_neutral={esg_neutral}"
-        )
+        logger.info(f"Parameters: gamma={gamma}, lookback_months={lookback_months}")
+
+        # Initialize constraint compiler
+        compiler = ConstraintCompiler()
 
         # Loop through each optimization date
         all_results = []
@@ -134,26 +173,13 @@ class MarkowitzPortfolioModel(BaseModel):
                 expected_returns_df, opt_date
             )
 
-            # 2. Prepare ESG betas (or use market betas as fallback)
-            logger.info("Step 2: Preparing factor betas")
-            if two_factor_betas_df is not None:
-                esg_beta_series = self._prepare_esg_betas(
-                    two_factor_betas_df, exp_ret_series.index.tolist()
-                )
-                logger.info("  Using ESG betas from two_factor model")
-            elif market_betas_df is not None:
-                # Use market betas as fallback (neutral ESG exposure = 1.0 for all)
-                esg_beta_series = self._prepare_market_betas_as_esg(
-                    market_betas_df, exp_ret_series.index.tolist()
-                )
-                logger.info("  Using market betas as ESG proxy (neutral = 1.0)")
-            else:
-                # No betas available - use neutral (1.0) for all stocks
-                esg_beta_series = pd.Series(1.0, index=exp_ret_series.index)
-                logger.info("  No betas available - using neutral (1.0) for all stocks")
+            # Validate universe alignment with constraints
+            # ✅ DSL: Constraints are now universe-agnostic (symbols=None)
+            # Symbol ordering comes from expected returns index
+            symbols = exp_ret_series.index.tolist()
 
-            # 3. Build covariance matrix
-            logger.info("Step 3: Building covariance matrix")
+            # 2. Build covariance matrix
+            logger.info("Step 2: Building covariance matrix")
             cov_matrix = self._build_covariance_matrix(
                 equity_prices=equity_prices,
                 risk_free=risk_free,
@@ -163,59 +189,44 @@ class MarkowitzPortfolioModel(BaseModel):
                 optimization_date=opt_date,
             )
 
-            # 4. Prepare sector mapping (if applicable)
-            sector_map = None
-            sector_caps_dict = None
-            if sector_constraints and sector_mapping_df is not None:
-                logger.info("Step 4: Preparing sector constraints")
-                sector_map = self._prepare_sector_mapping(
-                    sector_mapping_df, exp_ret_series.index.tolist()
-                )
-                # Apply sector cap to all sectors
-                sector_caps_dict = {
-                    sector: sector_cap
-                    for sector in sector_map.unique()
-                    if pd.notna(sector)
-                }
-                logger.info(
-                    f"  Applying sector cap of {sector_cap:.1%} to {len(sector_caps_dict)} sectors"
-                )
+            # Filter expected returns to match covariance matrix universe
+            # (some stocks may be excluded due to insufficient price history)
+            cov_symbols = cov_matrix.index.tolist()
+            exp_ret_series = exp_ret_series.loc[cov_symbols]
+            symbols = exp_ret_series.index.tolist()
 
-            # 5. Determine ESG bounds
-            esg_bounds = self._determine_esg_bounds(
-                esg_neutral, esg_lower_bound, esg_upper_bound
+            logger.info(
+                f"Universe after covariance filtering: {len(symbols)} stocks (down from {len(exp_ret_series)+len(symbols)-len(cov_symbols)})"
             )
 
-            # 6. Get current risk-free rate (for Sharpe calculation)
+            # 3. Get current risk-free rate (for Sharpe calculation)
             rf_monthly = self._get_current_rf_monthly(risk_free, opt_date)
 
-            # 7. Optimize portfolio
+            # 4. Compile constraints → canonical QP
+            logger.info("Step 3: Compiling constraints to canonical QP")
+
             if compute_frontier:
-                logger.info("Step 7: Computing efficient frontier")
+                logger.info("Step 4: Computing efficient frontier")
                 gammas = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0]
 
                 for g in gammas:
-                    weights = self._optimize_portfolio(
-                        exp_ret=exp_ret_series,
-                        cov_matrix=cov_matrix,
-                        esg_beta=esg_beta_series,
-                        gamma=g,
-                        long_only=long_only,
-                        position_max=position_max,
-                        esg_bounds=esg_bounds,
-                        sector_map=sector_map,
-                        sector_caps=sector_caps_dict,
+                    qp_problem = compiler.compile_qp(
+                        dsl=constraint_dsl,
+                        mu=exp_ret_series.values,
+                        Sigma=cov_matrix.values,
+                        risk_aversion=g,
+                        symbols=symbols,  # ✅ DSL: Pass symbols from expected returns
                     )
+
+                    weights = self._solve_qp(qp_problem)
 
                     result_df = self._format_output(
                         weights=weights,
                         exp_ret=exp_ret_series,
                         cov_matrix=cov_matrix,
-                        esg_beta=esg_beta_series,
-                        sector_map=sector_map,
+                        qp_problem=qp_problem,
                         optimization_date=opt_date,
                         gamma=g,
-                        esg_bounds=esg_bounds,
                         rf_monthly=rf_monthly,
                     )
                     all_results.append(result_df)
@@ -224,28 +235,25 @@ class MarkowitzPortfolioModel(BaseModel):
                     f"Generated {len(gammas)} frontier portfolios for {opt_date}"
                 )
             else:
-                logger.info(f"Step 7: Optimizing portfolio (gamma={gamma})")
-                weights = self._optimize_portfolio(
-                    exp_ret=exp_ret_series,
-                    cov_matrix=cov_matrix,
-                    esg_beta=esg_beta_series,
-                    gamma=gamma,
-                    long_only=long_only,
-                    position_max=position_max,
-                    esg_bounds=esg_bounds,
-                    sector_map=sector_map,
-                    sector_caps=sector_caps_dict,
+                logger.info(f"Step 4: Optimizing portfolio (gamma={gamma})")
+
+                qp_problem = compiler.compile_qp(
+                    dsl=constraint_dsl,
+                    mu=exp_ret_series.values,
+                    Sigma=cov_matrix.values,
+                    risk_aversion=gamma,
+                    symbols=symbols,  # ✅ DSL: Pass symbols from expected returns
                 )
+
+                weights = self._solve_qp(qp_problem)
 
                 result_df = self._format_output(
                     weights=weights,
                     exp_ret=exp_ret_series,
                     cov_matrix=cov_matrix,
-                    esg_beta=esg_beta_series,
-                    sector_map=sector_map,
+                    qp_problem=qp_problem,  # ✅ DSL: Pass QPProblem for provenance
                     optimization_date=opt_date,
                     gamma=gamma,
-                    esg_bounds=esg_bounds,
                     rf_monthly=rf_monthly,
                 )
                 all_results.append(result_df)
@@ -406,6 +414,12 @@ class MarkowitzPortfolioModel(BaseModel):
         # Calculate lookback start date
         start_date = optimization_date - pd.DateOffset(months=lookback_months)
 
+        print(f"\n🔍 Building covariance matrix:")
+        print(f"   Optimization date: {optimization_date}")
+        print(f"   Lookback period: {lookback_months} months")
+        print(f"   Start date: {start_date}")
+        print(f"   Number of tickers: {len(tickers)}")
+
         # Load and prepare returns for each ticker
         returns_dict = {}
 
@@ -435,7 +449,25 @@ class MarkowitzPortfolioModel(BaseModel):
 
         # Create returns panel
         returns_df = pd.DataFrame(returns_dict)
-        returns_df = returns_df.dropna()  # Drop dates with any missing data
+
+        print(
+            f"   Initial panel: {len(returns_df)} dates × {len(returns_df.columns)} stocks"
+        )
+        print(
+            f"   Missing values: {returns_df.isna().sum().sum()} / {returns_df.size} ({returns_df.isna().sum().sum()/returns_df.size*100:.1f}%)"
+        )
+
+        # Drop stocks with too many missing values (>50% missing)
+        missing_pct_by_stock = returns_df.isna().sum() / len(returns_df)
+        stocks_to_keep = missing_pct_by_stock[missing_pct_by_stock < 0.5].index
+        returns_df = returns_df[stocks_to_keep]
+
+        print(
+            f"   After dropping sparse stocks: {len(returns_df.columns)} stocks (removed {len(returns_dict) - len(stocks_to_keep)} stocks)"
+        )
+
+        # Fill remaining missing values with 0 (assumes no return when data missing)
+        returns_df = returns_df.fillna(0.0)
 
         logger.info(
             f"Built returns panel: {len(returns_df)} months, {len(returns_df.columns)} stocks"
@@ -532,6 +564,167 @@ class MarkowitzPortfolioModel(BaseModel):
 
         logger.info("ESG bounds: None (unconstrained)")
         return None
+
+    def _solve_qp(self, qp: QPProblem) -> pd.Series:
+        """
+        Solve canonical QP problem using CVXPY.
+
+        Args:
+            qp: Canonical QP problem with matrices (P,q,G,h,A,b,l,u)
+
+        Returns:
+            Optimal weights as pandas Series
+
+        Raises:
+            RuntimeError: If optimization fails
+        """
+        n = qp.n_vars
+
+        # Decision variable
+        w = cp.Variable(n)
+
+        # Convert matrices to dense and create CVXPY parameters (not constants)
+        # This avoids scipy sparse matrix .A attribute issues in CVXPY
+        P_dense = np.array(qp.P, dtype=np.float64)
+        q_dense = np.array(qp.q, dtype=np.float64).ravel()
+
+        # Ensure P is symmetric
+        P_dense = 0.5 * (P_dense + P_dense.T)
+
+        # Create parameters (not embedded constants)
+        P_param = cp.Parameter(P_dense.shape, value=P_dense, PSD=True)
+        q_param = cp.Parameter(q_dense.shape, value=q_dense)
+
+        # Objective: minimize ½w'Pw + q'w
+        objective = 0.5 * cp.quad_form(w, P_param) + q_param @ w
+
+        # Constraints
+        constraints = []
+
+        # Equality constraints: Aw = b
+        if qp.n_eq > 0:
+            A_dense = np.array(qp.A, dtype=np.float64)
+            b_dense = np.array(qp.b, dtype=np.float64).ravel()
+            A_param = cp.Parameter(A_dense.shape, value=A_dense)
+            b_param = cp.Parameter(b_dense.shape, value=b_dense)
+            constraints.append(A_param @ w == b_param)
+
+        # Inequality constraints: Gw ≤ h
+        if qp.n_ineq > 0:
+            G_dense = np.array(qp.G, dtype=np.float64)
+            h_dense = np.array(qp.h, dtype=np.float64).ravel()
+            G_param = cp.Parameter(G_dense.shape, value=G_dense)
+            h_param = cp.Parameter(h_dense.shape, value=h_dense)
+            constraints.append(G_param @ w <= h_param)
+
+        # Box constraints: l ≤ w ≤ u
+        l_dense = np.array(qp.l, dtype=np.float64).ravel()
+        u_dense = np.array(qp.u, dtype=np.float64).ravel()
+        l_param = cp.Parameter(l_dense.shape, value=l_dense)
+        u_param = cp.Parameter(u_dense.shape, value=u_dense)
+        constraints.append(w >= l_param)
+        constraints.append(w <= u_param)
+
+        # Solve
+        prob = cp.Problem(cp.Minimize(objective), constraints)
+        try:
+            # Try OSQP first (faster for QP)
+            prob.solve(solver=cp.OSQP, verbose=False)
+        except (AttributeError, Exception) as e:
+            # Fallback to SCS (more robust)
+            logger.warning(
+                f"OSQP failed ({str(e)[:50]}...), falling back to SCS solver"
+            )
+            prob.solve(solver=cp.SCS, verbose=False)
+
+        if w.value is None:
+            logger.error(f"  ❌ Optimization failed!")
+            logger.error(f"  Problem status: {prob.status}")
+            logger.error(f"  {qp.summary()}")
+            raise RuntimeError(f"Optimization failed: {prob.status}")
+
+        weights = pd.Series(np.array(w.value).ravel(), index=qp.symbols)
+
+        # Log optimization stats
+        portfolio_return = -float(qp.q @ weights.values)  # q = -mu
+        portfolio_vol = np.sqrt(
+            weights.values @ qp.P @ weights.values / qp.meta.get("risk_aversion", 1.0)
+        )
+        logger.info(
+            f"  Portfolio return: {portfolio_return:.4f} ({portfolio_return*12*100:.2f}% annual)"
+        )
+        logger.info(
+            f"  Portfolio vol: {portfolio_vol:.4f} ({portfolio_vol*np.sqrt(12)*100:.2f}% annual)"
+        )
+        logger.info(f"  Num positions: {(weights > 0.001).sum()}")
+
+        return weights
+
+    def _format_output(
+        self,
+        weights: pd.Series,
+        exp_ret: pd.Series,
+        cov_matrix: pd.DataFrame,
+        qp_problem: QPProblem,
+        optimization_date: pd.Timestamp,
+        gamma: float,
+        rf_monthly: float,
+    ) -> pd.DataFrame:
+        """
+        Format optimization output.
+
+        Args:
+            weights: Optimal weights
+            exp_ret: Expected returns
+            cov_matrix: Covariance matrix
+            qp_problem: Compiled QP problem (for provenance)
+            optimization_date: Optimization date
+            gamma: Risk aversion parameter
+            rf_monthly: Risk-free rate (monthly)
+
+        Returns:
+            DataFrame with portfolio positions and statistics
+        """
+        # Filter to non-zero positions
+        non_zero_weights = weights[weights > 1e-6].copy()
+
+        if len(non_zero_weights) == 0:
+            logger.warning("  ⚠️  No non-zero positions found!")
+            return pd.DataFrame()
+
+        # Build output DataFrame
+        output = pd.DataFrame(
+            {
+                "symbol": non_zero_weights.index,
+                "weight": non_zero_weights.values,
+                "optimization_date": optimization_date,
+                "exp_return_monthly": [
+                    exp_ret[ticker] for ticker in non_zero_weights.index
+                ],
+                "exp_return_annual": [
+                    (1 + exp_ret[ticker]) ** 12 - 1 for ticker in non_zero_weights.index
+                ],
+            }
+        )
+
+        # Portfolio-level statistics
+        portfolio_return = weights @ exp_ret
+        portfolio_vol = np.sqrt(weights @ cov_matrix @ weights)
+        portfolio_sharpe = (
+            (portfolio_return - rf_monthly) / portfolio_vol
+            if portfolio_vol > 0
+            else 0.0
+        )
+
+        output["portfolio_return"] = portfolio_return
+        output["portfolio_vol"] = portfolio_vol
+        output["portfolio_sharpe"] = portfolio_sharpe
+        output["gamma"] = gamma
+
+        # ✅ DSL: No legacy ESG/sector extraction needed
+        # Constraint provenance is in qp_problem.meta
+
+        return output
 
     def _get_current_rf_monthly(
         self,
@@ -683,7 +876,7 @@ class MarkowitzPortfolioModel(BaseModel):
 
         return weights
 
-    def _format_output(
+    def _format_output_legacy(
         self,
         weights: pd.Series,
         exp_ret: pd.Series,
@@ -696,7 +889,7 @@ class MarkowitzPortfolioModel(BaseModel):
         rf_monthly: float,
     ) -> pd.DataFrame:
         """
-        Format optimization results as output DataFrame.
+        Format optimization results as output DataFrame (LEGACY path).
 
         Args:
             weights: Optimal portfolio weights

@@ -1,0 +1,67 @@
+# ============================================================================
+# ESG Constraints Loader Configuration
+# ============================================================================
+
+loader:
+  id: esg_constraints
+  version: 1.0.0
+  description: "Generate ESG-based portfolio constraints from ESG scores"
+
+# ============================================================================
+# INPUTS: Curated datasets (resolved via contracts)
+# ============================================================================
+inputs:
+  - name: esg_scores
+    required: true
+    type:
+      domain: esg
+      subdomain: esg-scores
+    description: "ESG scores for portfolio universe"
+
+# ============================================================================
+# PARAMETERS: Configuration values
+# ============================================================================
+# NOTE: ESG constraints are dimension-specific (require symbol-aligned coefficients)
+# Unlike basic constraints (SumConstraint, BoundsConstraint), DotConstraint needs
+# coefficients aligned with the universe. Symbols should come from the MODEL
+# (extracted from expected returns) rather than hardcoded in DAG tasks.
+#
+parameters:
+  symbols:
+    type: list
+    required: true
+    description: |
+      List of ticker symbols in portfolio universe.
+      BEST PRACTICE: Pass from model context (expected returns index),
+      not hardcoded in DAG. Example:
+        symbols = exp_ret_series.index.tolist()
+        constraint_dsl = esg_loader.load(overrides={'symbols': symbols})
+
+  exchange:
+    type: string
+    default: "US"
+    description: "Exchange for ESG data"
+
+  min_esg_score:
+    type: float
+    required: false
+    description: "Minimum portfolio-weighted ESG score (0-100)"
+
+  max_esg_score:
+    type: float
+    required: false
+    description: "Maximum portfolio-weighted ESG score (0-100)"
+
+  target_esg_score:
+    type: float
+    required: false
+    description: "Target portfolio-weighted ESG score (equality constraint)"
+
+# ============================================================================
+# OUTPUT: Validation rules
+# ============================================================================
+output:
+  type: ConstraintDSL
+  description: "DSL constraint object with ESG exposure constraints"
+  validation:
+    required_attributes: ["constraints", "symbols", "metadata"]
