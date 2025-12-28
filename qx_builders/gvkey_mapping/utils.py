@@ -44,7 +44,7 @@ def clean_ticker_symbol(ticker: str) -> str:
 
 def load_gvkey_mapping_from_curated(
     exchange: str = "US",
-    base_path: str = "data/curated/metadata/gvkey_mapping/schema_v1",
+    base_path: str = "data/curated/instrument-reference/identifiers/gvkey/schema_v1",
 ) -> pd.DataFrame:
     """
     Load GVKEY mapping from curated storage.

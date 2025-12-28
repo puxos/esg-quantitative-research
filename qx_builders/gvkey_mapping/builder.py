@@ -49,7 +49,11 @@ def clean_ticker_symbol(ticker: str) -> str:
 
 class GVKEYMappingBuilder(DataBuilderBase):
     """
-    Builder for GVKEY-ticker mapping metadata.
+    SOURCE BUILDER: GVKEY-ticker mapping metadata from local Excel file.
+
+    External Source: Local Excel file (CRSP/Compustat data_mapping.xlsx)
+    Transform: Excel (gvkey, tic) → Normalized mapping (gvkey, ticker, ticker_raw)
+    Authentication: None (local file)
 
     GVKEY provides a stable company identifier that survives:
     - Ticker symbol changes
@@ -160,35 +164,3 @@ class GVKEYMappingBuilder(DataBuilderBase):
         print(curated.head(5).to_string(index=False))
 
         return curated
-
-    def build(
-        self, partitions: Optional[dict] = None, exchange: Optional[str] = None
-    ) -> dict:
-        """
-        Build GVKEY mapping data.
-
-        Args:
-            partitions: Partition values (e.g., {"exchange": "US"})
-            exchange: Exchange code (legacy parameter, overridden by partitions)
-
-        Returns:
-            Result dict with status and output info
-        """
-        # Extract exchange from partitions or use parameter
-        partitions = partitions or {}
-        exchange_value = partitions.get("exchange", exchange or "US")
-
-        # Update partitions with final value
-        partitions["exchange"] = exchange_value
-
-        # Call base class build() which handles full pipeline
-        output_path = super().build(partitions=partitions)
-
-        # Return result dict
-        return {
-            "status": "success",
-            "builder": self.info["id"],
-            "version": self.info["version"],
-            "output_path": output_path,
-            "layer": "curated",
-        }
