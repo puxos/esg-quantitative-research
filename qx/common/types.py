@@ -68,12 +68,14 @@ class Subdomain(Enum):
     EXPECTED_RETURNS = "expected-returns"
     FACTOR_RETURNS = "factor-returns"
     FACTOR_EXPOSURES = "factor-exposures"
+    BACKTEST_RESULTS = "backtest-results"
 
     # Portfolio
     POSITIONS = "positions"
     TRANSACTIONS = "transactions"
     PNL = "pnl"
     PORTFOLIO_WEIGHTS = "portfolio-weights"
+    PORTFOLIOS = "portfolios"
 
     # Data Products
     RESEARCH_EXPORTS = "research-exports"

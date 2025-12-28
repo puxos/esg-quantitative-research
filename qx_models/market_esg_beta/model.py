@@ -120,11 +120,20 @@ class MarketESGBetaModel(BaseModel):
         market_excess = self._prepare_market_returns(market_prices, rf_df)
 
         # Prepare ESG factor (already monthly from ESGFactorModel)
+        # ESG factor comes in wide format with columns: [date, ESG_factor, E_factor, S_factor, G_factor, ...]
         logger.info(f"  Extracting {esg_factor_name} factor...")
-        esg_factor = esg_factors[esg_factors["factor_name"] == esg_factor_name][
-            ["date", "factor_return"]
-        ].copy()
-        esg_factor = esg_factor.rename(columns={"factor_return": "esg_factor"})
+
+        # Map parameter name to column name (e.g., "ESG" -> "ESG_factor")
+        factor_col = f"{esg_factor_name}_factor"
+
+        if factor_col not in esg_factors.columns:
+            raise ValueError(
+                f"Factor column '{factor_col}' not found in ESG factor data. "
+                f"Available columns: {list(esg_factors.columns)}"
+            )
+
+        esg_factor = esg_factors[["date", factor_col]].copy()
+        esg_factor = esg_factor.rename(columns={factor_col: "esg_factor"})
 
         logger.info(f"    Stock returns: {len(stock_returns)} observations")
         logger.info(f"    Market excess: {len(market_excess)} observations")

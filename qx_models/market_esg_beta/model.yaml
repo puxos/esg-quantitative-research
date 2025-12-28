@@ -299,13 +299,15 @@ parameters:
 
   window_size:
     type: int
-    default: null
+    default: 60 # ← CHANGED: Use 60-month rolling window for time-series betas
     min: 36
     max: 120
     description: |
       Rolling window size in months (null = full sample).
-      - null: Single cross-sectional regression (one beta per stock)
-      - 36-120: Rolling window (time-series of betas)
+      - null: Single cross-sectional regression (one beta per stock) ⚠️ CAUSES LOOK-AHEAD BIAS!
+      - 36-120: Rolling window (time-series of betas) ← REQUIRED FOR BACKTESTING
+
+      Default: 60 months (5 years) - balances stability vs. adaptivity
       Minimum 36 months for statistical robustness.
 
   min_observations:
