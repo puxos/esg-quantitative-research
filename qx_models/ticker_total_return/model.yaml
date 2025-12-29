@@ -1,0 +1,190 @@
+# ============================================================================
+# Model Configuration: Ticker Total Return
+# ============================================================================
+
+model:
+  id: ticker_total_return_model
+  version: 1.0.0
+  description: "Calculates total return for specific ticker(s) over a date range using adjusted close prices"
+
+# ============================================================================
+# INPUTS: OHLCV price data
+# ============================================================================
+inputs:
+  - name: equity_prices
+    required: true
+    type:
+      domain: market-data
+      asset_class: equity
+      subdomain: bars
+      frequency: null # Can be daily, monthly, etc.
+      region: null
+    description: "OHLCV data with adjusted close prices for total return calculation"
+
+# ============================================================================
+# OUTPUT: Total return metrics
+# ============================================================================
+output:
+  type:
+    domain: derived-metrics
+    subdomain: backtest-results # Reusing existing subdomain for performance metrics
+  description: "Total return metrics for each ticker including cumulative returns, annualized returns, volatility, and Sharpe ratio"
+
+  schema:
+    schema_version: schema_v1
+
+    columns:
+      - name: symbol
+        type: str
+        description: Ticker symbol
+        required: true
+        filterable: true
+        filter_type: exact
+
+      - name: start_date
+        type: date
+        description: First observation date
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: end_date
+        type: date
+        description: Last observation date
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: observations
+        type: int
+        description: Number of price observations
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: start_price
+        type: float
+        description: First adjusted close price
+        required: true
+        filterable: false
+
+      - name: end_price
+        type: float
+        description: Last adjusted close price
+        required: true
+        filterable: false
+
+      - name: total_return
+        type: float
+        description: Total return over period (decimal, e.g., 0.25 = 25%)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: total_return_pct
+        type: float
+        description: Total return as percentage
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: annualized_return
+        type: float
+        description: Annualized return (CAGR)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: annualized_return_pct
+        type: float
+        description: Annualized return as percentage
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: volatility
+        type: float
+        description: Annualized volatility (standard deviation of returns)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: volatility_pct
+        type: float
+        description: Annualized volatility as percentage
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: sharpe_ratio
+        type: float
+        description: Sharpe ratio (assuming risk-free rate = 0)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: max_drawdown
+        type: float
+        description: Maximum drawdown (decimal)
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: max_drawdown_pct
+        type: float
+        description: Maximum drawdown as percentage
+        required: true
+        filterable: true
+        filter_type: range
+
+      - name: positive_days_pct
+        type: float
+        description: Percentage of positive return days
+        required: true
+        filterable: true
+        filter_type: range
+
+    partitions:
+      - column: exchange
+        type: str
+        description: Exchange (US, HK, etc.)
+        required: false
+
+      - column: frequency
+        type: str
+        description: Data frequency (daily, monthly, etc.)
+        required: false
+
+# ============================================================================
+# PARAMETERS: Model configuration
+# ============================================================================
+parameters:
+  symbols:
+    type: list
+    default: []
+    description: "List of ticker symbols to calculate returns for. If empty, uses all symbols in input data"
+
+  start_date:
+    type: str
+    default: null
+    description: "Start date for calculation (YYYY-MM-DD). If null, uses first available date in data"
+
+  end_date:
+    type: str
+    default: null
+    description: "End date for calculation (YYYY-MM-DD). If null, uses last available date in data"
+
+  periods_per_year:
+    type: int
+    default: 252
+    description: "Number of periods per year for annualization (252 for daily, 12 for monthly, 52 for weekly)"
+
+  min_observations:
+    type: int
+    default: 2
+    description: "Minimum number of observations required to calculate returns"
+
+  include_time_series:
+    type: bool
+    default: false
+    description: "If true, also output time series of cumulative returns for each ticker"
