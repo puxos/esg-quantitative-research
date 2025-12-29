@@ -90,6 +90,7 @@ def create_infrastructure(
     return PipelineContext(
         registry=registry,
         backend=backend,
+        adapter=adapter,
         resolver=resolver,
         curated_writer=curated_writer,
         processed_writer=processed_writer,

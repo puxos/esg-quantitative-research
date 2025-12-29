@@ -12,6 +12,7 @@ from qx.orchestration.factories import run_builder, run_loader, run_model
 from qx.storage.backend_local import LocalParquetBackend
 from qx.storage.curated_writer import CuratedWriter
 from qx.storage.pathing import PathResolver
+from qx.storage.table_format import TableFormatAdapter
 
 
 class PipelineContext:
@@ -26,7 +27,9 @@ class PipelineContext:
         >>> ctx = PipelineContext(
         ...     registry=registry,
         ...     backend=backend,
+        ...     adapter=adapter,
         ...     resolver=resolver,
+        ...     curated_writer=curated_writer,
         ...     processed_writer=processed_writer,
         ...     run_id="my-pipeline-20250129"
         ... )
@@ -46,6 +49,7 @@ class PipelineContext:
         self,
         registry: DatasetRegistry,
         backend: LocalParquetBackend,
+        adapter: TableFormatAdapter,
         resolver: PathResolver,
         curated_writer: CuratedWriter,
         processed_writer: ProcessedWriterBase,
@@ -57,6 +61,7 @@ class PipelineContext:
         Args:
             registry: Dataset registry for contract resolution
             backend: Storage backend (e.g., LocalParquetBackend)
+            adapter: Table format adapter for writing data
             resolver: Path resolver for generating storage paths
             curated_writer: Writer for curated datasets
             processed_writer: Writer for processed datasets
@@ -64,6 +69,7 @@ class PipelineContext:
         """
         self.registry = registry
         self.backend = backend
+        self.adapter = adapter
         self.resolver = resolver
         self.curated_writer = curated_writer
         self.processed_writer = processed_writer
@@ -95,7 +101,9 @@ class PipelineContext:
         """
         return run_builder(
             package_path=package_path,
-            writer=self.curated_writer,
+            registry=self.registry,
+            adapter=self.adapter,
+            resolver=self.resolver,
             partitions=partitions or {},
             overrides=overrides or {},
         )
